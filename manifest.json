@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -23,8 +24,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html",
-    "default_title": "LlamB Chat Assistant",
+    "default_title": "LlamB Chat Assistant - Click to toggle sidebar",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -45,7 +45,8 @@
         "js/storage-manager.js",
         "js/llm-manager.js",
         "js/llm-providers.js",
-        "js/stream-parser.js"
+        "js/stream-parser.js",
+        "icons/icon128.png"
       ],
       "matches": ["<all_urls>"]
     }

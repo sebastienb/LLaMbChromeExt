@@ -19,6 +19,25 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   llmManager = new LLMManager();
   await llmManager.initialize();
   
+  // Create context menu items
+  chrome.contextMenus.create({
+    id: "toggle-sidebar",
+    title: "Toggle Chat Sidebar",
+    contexts: ["all"]
+  });
+  
+  chrome.contextMenus.create({
+    id: "quick-settings", 
+    title: "Quick Settings",
+    contexts: ["all"]
+  });
+  
+  chrome.contextMenus.create({
+    id: "manage-connections",
+    title: "Manage Connections", 
+    contexts: ["all"]
+  });
+  
   // Migrate old settings if they exist
   try {
     const oldSettings = await chrome.storage.sync.get([
@@ -50,6 +69,55 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!llmManager) {
     llmManager = new LLMManager();
     await llmManager.initialize();
+  }
+});
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  try {
+    switch(info.menuItemId) {
+      case "toggle-sidebar":
+        await chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
+        break;
+        
+      case "quick-settings":
+        // Open popup.html in a new popup window
+        await chrome.windows.create({
+          url: chrome.runtime.getURL('popup.html'),
+          type: 'popup',
+          width: 360,
+          height: 600
+        });
+        break;
+        
+      case "manage-connections":
+        await chrome.tabs.create({
+          url: chrome.runtime.getURL('settings.html')
+        });
+        break;
+    }
+  } catch (error) {
+    console.log('Context menu action failed:', error);
+    
+    // For toggle-sidebar, try to inject content script if needed
+    if (info.menuItemId === "toggle-sidebar") {
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        });
+        
+        setTimeout(async () => {
+          try {
+            await chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
+          } catch (e) {
+            console.log('Still could not toggle sidebar:', e);
+          }
+        }, 200);
+      } catch (injectionError) {
+        console.log('Could not inject content script:', injectionError);
+      }
+    }
   }
 });
 

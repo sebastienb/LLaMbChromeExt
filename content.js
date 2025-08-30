@@ -10,6 +10,197 @@
 
   let sidebar = null;
   let isVisible = false;
+  let preservedSelections = []; // Array to store multiple selections
+  let selectionCounter = 0;
+
+  // Theme management
+  let currentTheme = null;
+
+  function getPreferredTheme() {
+    // Check if user has manually set a theme
+    const storedTheme = localStorage.getItem('llamb-theme');
+    if (storedTheme) {
+      return storedTheme;
+    }
+    
+    // Fall back to system preference
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function applyTheme(theme) {
+    currentTheme = theme;
+    document.documentElement.setAttribute('data-llamb-theme', theme);
+    
+    if (sidebar) {
+      sidebar.setAttribute('data-llamb-theme', theme);
+    }
+
+    // Update theme button title
+    const themeBtn = document.getElementById('llamb-theme-btn');
+    if (themeBtn) {
+      themeBtn.title = `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`;
+    }
+  }
+
+  function toggleTheme() {
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('llamb-theme', newTheme);
+    applyTheme(newTheme);
+  }
+
+  // Theme detection and application
+  function detectAndApplyTheme() {
+    const preferredTheme = getPreferredTheme();
+    applyTheme(preferredTheme);
+  }
+
+  // Listen for theme changes (only if user hasn't manually set a theme)
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      // Only auto-update if user hasn't manually set a theme
+      if (!localStorage.getItem('llamb-theme')) {
+        detectAndApplyTheme();
+      }
+    });
+  }
+
+  // Capture and preserve text selection
+  function captureSelection() {
+    const selection = window.getSelection().toString().trim();
+    if (selection && !isSelectionAlreadyPreserved(selection)) {
+      const selectionObj = {
+        id: `selection-${Date.now()}-${selectionCounter++}`,
+        text: selection,
+        timestamp: new Date().toISOString()
+      };
+      preservedSelections.push(selectionObj);
+      console.log('LlamB: Captured selection:', selectionObj);
+    }
+    return selection;
+  }
+
+  // Check if selection is already preserved
+  function isSelectionAlreadyPreserved(text) {
+    return preservedSelections.some(sel => sel.text === text);
+  }
+
+  // Clear all preserved selections
+  function clearAllSelections() {
+    preservedSelections = [];
+    updateContextChips();
+  }
+
+  // Remove specific selection by id
+  function removeSelection(selectionId) {
+    preservedSelections = preservedSelections.filter(sel => sel.id !== selectionId);
+    updateContextChips();
+  }
+
+  // Truncate text for display
+  function truncateText(text, maxLength) {
+    return text.length > maxLength 
+      ? text.substring(0, maxLength) + '...' 
+      : text;
+  }
+
+  // Simple markdown renderer
+  function renderMarkdown(text) {
+    if (!text) return '';
+    
+    let html = text
+      // Code blocks (triple backticks)
+      .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+        const language = lang || 'text';
+        return `<pre class="llamb-code-block" data-lang="${language}"><code>${escapeHtml(code.trim())}</code></pre>`;
+      })
+      // Inline code (single backticks)  
+      .replace(/`([^`]+)`/g, '<code class="llamb-inline-code">$1</code>')
+      // Bold text
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.*?)__/g, '<strong>$1</strong>')
+      // Italic text
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/_(.*?)_/g, '<em>$1</em>')
+      // Links
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      // Headers
+      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+      // Lists
+      .replace(/^\* (.*$)/gm, '<li>$1</li>')
+      .replace(/^- (.*$)/gm, '<li>$1</li>')
+      .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
+      // Line breaks
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+
+    // Wrap in paragraphs and handle lists
+    html = '<p>' + html + '</p>';
+    
+    // Fix list handling
+    html = html.replace(/<p>(<li>.*?<\/li>)<\/p>/g, '<ul>$1</ul>');
+    html = html.replace(/<\/li><br><li>/g, '</li><li>');
+    html = html.replace(/<ul><li>/g, '<ul><li>');
+    html = html.replace(/<\/li><\/ul>/g, '</li></ul>');
+    
+    // Clean up empty paragraphs and extra breaks
+    html = html.replace(/<p><\/p>/g, '');
+    html = html.replace(/<p><br><\/p>/g, '');
+    html = html.replace(/(<\/h[1-6]>)<br>/g, '$1');
+    html = html.replace(/(<\/pre>)<br>/g, '$1');
+    
+    return html;
+  }
+
+  // Update context chips display
+  function updateContextChips() {
+    const chipsContainer = document.getElementById('llamb-context-chips');
+    if (!chipsContainer) return;
+    
+    // Update page chip
+    const pageChip = chipsContainer.querySelector('.llamb-chip-page .llamb-chip-text');
+    if (pageChip) {
+      pageChip.textContent = document.title || 'Current page';
+    }
+    
+    // Remove existing selection chips
+    const existingSelectionChips = chipsContainer.querySelectorAll('.llamb-chip-selection');
+    existingSelectionChips.forEach(chip => chip.remove());
+    
+    // Add chips for all preserved selections
+    preservedSelections.forEach(selection => {
+      const selectionChip = createSelectionChip(selection);
+      chipsContainer.appendChild(selectionChip);
+    });
+    
+    // Show/hide clear all button
+    const clearAllBtn = document.getElementById('llamb-clear-all');
+    if (clearAllBtn) {
+      clearAllBtn.style.display = preservedSelections.length > 1 ? 'block' : 'none';
+    }
+  }
+
+  // Create selection chip element
+  function createSelectionChip(selection) {
+    const chip = document.createElement('div');
+    chip.className = 'llamb-chip llamb-chip-selection';
+    chip.dataset.selectionId = selection.id;
+    chip.innerHTML = `
+      <span class="llamb-chip-icon">✂️</span>
+      <span class="llamb-chip-text">${truncateText(selection.text, 30)}</span>
+      <button class="llamb-chip-close" aria-label="Clear selection">×</button>
+    `;
+    
+    // Add click handler to remove specific selection
+    chip.querySelector('.llamb-chip-close').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      removeSelection(selection.id);
+    });
+    
+    return chip;
+  }
 
   // Create sidebar container
   function createSidebar() {
@@ -21,24 +212,45 @@
     sidebarContainer.innerHTML = `
       <div class="llamb-sidebar-header">
         <div class="llamb-sidebar-title">
-          <span class="llamb-logo">🦙</span>
+          <img src="${chrome.runtime.getURL('icons/icon128.png')}" alt="LlamB" class="llamb-logo">
           <span>LlamB Assistant</span>
         </div>
-        <button class="llamb-sidebar-close" id="llamb-close-btn">×</button>
+        <div class="llamb-header-actions">
+          <button class="llamb-theme-toggle" id="llamb-theme-btn" title="Toggle theme">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-theme-icon llamb-theme-light-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-theme-icon llamb-theme-dark-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
+            </svg>
+          </button>
+          <button class="llamb-sidebar-close" id="llamb-close-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-close-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="llamb-sidebar-content">
         <div class="llamb-chat-messages" id="llamb-messages">
-          <div class="llamb-message llamb-assistant-message">
-            <div class="llamb-message-content">
-              Hello! I'm your AI assistant. I can see the current webpage and help you analyze it. How can I assist you today?
+          <div class="llamb-message-container llamb-assistant-container">
+            <div class="llamb-message-avatar">
+              <div class="llamb-avatar llamb-assistant-avatar">AI</div>
             </div>
-            <div class="llamb-message-meta">Assistant</div>
+            <div class="llamb-message-bubble llamb-assistant-bubble">
+              <div class="llamb-message-content">
+                Hello! I'm your AI assistant. I can see the current webpage and help you analyze it. How can I assist you today?
+              </div>
+            </div>
           </div>
         </div>
         <div class="llamb-chat-input-container">
-          <div class="llamb-context-info" id="llamb-context">
-            <span class="llamb-context-indicator">📄</span>
-            <span class="llamb-context-text">Current page: ${document.title}</span>
+          <div class="llamb-context-chips" id="llamb-context-chips">
+            <div class="llamb-chip llamb-chip-page">
+              <span class="llamb-chip-icon">📄</span>
+              <span class="llamb-chip-text" id="page-title">${document.title || 'Current page'}</span>
+            </div>
+            <button class="llamb-clear-all-btn" id="llamb-clear-all" style="display: none;">Clear All Selections</button>
           </div>
           <div class="llamb-input-wrapper">
             <textarea 
@@ -47,8 +259,8 @@
               rows="1"
             ></textarea>
             <button id="llamb-send-btn" class="llamb-send-btn">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="m22 2-7 20-4-9-9-4 20-7z"/>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-send-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18" />
               </svg>
             </button>
           </div>
@@ -69,10 +281,17 @@
   function toggleSidebar() {
     console.log('LlamB: toggleSidebar called, current isVisible:', isVisible);
     
+    // Capture selection before showing sidebar
+    if (!isVisible) {
+      captureSelection();
+    }
+    
     if (!sidebar) {
       console.log('LlamB: Creating sidebar...');
       sidebar = createSidebar();
       setupEventListeners();
+      // Apply theme after sidebar and buttons are created
+      detectAndApplyTheme();
     }
 
     isVisible = !isVisible;
@@ -87,10 +306,16 @@
       document.body.classList.remove('llamb-sidebar-closed');
       document.body.classList.add('llamb-sidebar-open');
       console.log('LlamB: Added llamb-sidebar-open to body');
+      
+      // Update context chips when showing sidebar
+      setTimeout(() => updateContextChips(), 100);
     } else {
       document.body.classList.remove('llamb-sidebar-open');
       document.body.classList.add('llamb-sidebar-closed');
       console.log('LlamB: Added llamb-sidebar-closed to body');
+      
+      // Clear all selections when sidebar closes
+      clearAllSelections();
     }
   }
 
@@ -98,12 +323,14 @@
   function setupEventListeners() {
     const toggleBtn = document.getElementById('llamb-toggle-btn');
     const closeBtn = document.getElementById('llamb-close-btn');
+    const themeBtn = document.getElementById('llamb-theme-btn');
     const sendBtn = document.getElementById('llamb-send-btn');
     const chatInput = document.getElementById('llamb-chat-input');
 
     console.log('LlamB: Setting up event listeners...');
     console.log('LlamB: toggleBtn found:', !!toggleBtn);
     console.log('LlamB: closeBtn found:', !!closeBtn);
+    console.log('LlamB: themeBtn found:', !!themeBtn);
     
     if (toggleBtn) {
       toggleBtn.addEventListener('click', (e) => {
@@ -120,11 +347,21 @@
         e.preventDefault();
         e.stopPropagation();
         isVisible = false;
-        sidebar.className = 'llamb-sidebar-hidden';
+        sidebar.classList.remove('llamb-sidebar-visible');
+        sidebar.classList.add('llamb-sidebar-hidden');
         
         // Update body classes to restore normal layout
         document.body.classList.remove('llamb-sidebar-open');
         document.body.classList.add('llamb-sidebar-closed');
+      });
+    }
+
+    if (themeBtn) {
+      themeBtn.addEventListener('click', (e) => {
+        console.log('LlamB: Theme button clicked!');
+        e.preventDefault();
+        e.stopPropagation();
+        toggleTheme();
       });
     }
 
@@ -141,6 +378,16 @@
       chatInput.style.height = 'auto';
       chatInput.style.height = Math.min(chatInput.scrollHeight, 100) + 'px';
     });
+
+    // Clear all selections button
+    const clearAllBtn = document.getElementById('llamb-clear-all');
+    if (clearAllBtn) {
+      clearAllBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        clearAllSelections();
+      });
+    }
   }
 
   // Send message function
@@ -163,10 +410,14 @@
 
     // Add user message
     const userMessageDiv = document.createElement('div');
-    userMessageDiv.className = 'llamb-message llamb-user-message';
+    userMessageDiv.className = 'llamb-message-container llamb-user-container';
     userMessageDiv.innerHTML = `
-      <div class="llamb-message-content">${escapeHtml(message)}</div>
-      <div class="llamb-message-meta">You</div>
+      <div class="llamb-message-avatar">
+        <div class="llamb-avatar llamb-user-avatar">You</div>
+      </div>
+      <div class="llamb-message-bubble llamb-user-bubble">
+        <div class="llamb-message-content">${renderMarkdown(message)}</div>
+      </div>
     `;
     messagesContainer.appendChild(userMessageDiv);
 
@@ -175,22 +426,6 @@
     chatInput.style.height = 'auto';
 
     // Scroll to bottom
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-    // Create assistant message placeholder for streaming
-    const assistantMessageDiv = document.createElement('div');
-    assistantMessageDiv.className = 'llamb-message llamb-assistant-message';
-    assistantMessageDiv.innerHTML = `
-      <div class="llamb-message-content llamb-message-streaming">
-        <div class="llamb-typing-indicator">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </div>
-      <div class="llamb-message-meta">Assistant</div>
-    `;
-    messagesContainer.appendChild(assistantMessageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     try {
@@ -219,9 +454,21 @@
       }
 
       console.log('LlamB: Message sent, requestId:', response.requestId);
-      
-      // Store requestId for tracking streaming updates
+
+      // Create assistant message placeholder for streaming
+      const assistantMessageDiv = document.createElement('div');
+      assistantMessageDiv.className = 'llamb-message-container llamb-assistant-container';
       assistantMessageDiv.dataset.requestId = response.requestId;
+      assistantMessageDiv.innerHTML = `
+        <div class="llamb-message-avatar">
+          <div class="llamb-avatar llamb-assistant-avatar">AI</div>
+        </div>
+        <div class="llamb-message-bubble llamb-assistant-bubble">
+          <div class="llamb-message-content llamb-message-streaming"></div>
+        </div>
+      `;
+      messagesContainer.appendChild(assistantMessageDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     } catch (error) {
       console.error('LlamB: Error sending message:', error);
@@ -250,21 +497,14 @@
 
     const contentDiv = assistantMessage.querySelector('.llamb-message-content');
     
-    // Remove typing indicator on first chunk
+    // Remove streaming indicator on first chunk
     if (contentDiv.classList.contains('llamb-message-streaming')) {
       contentDiv.classList.remove('llamb-message-streaming');
       contentDiv.innerHTML = '';
     }
 
-    // Update content with streaming text
-    const textContent = contentDiv.querySelector('.llamb-text-content') || document.createElement('div');
-    if (!textContent.parentNode) {
-      textContent.className = 'llamb-text-content';
-      contentDiv.appendChild(textContent);
-    }
-
-    // Escape and append new content
-    textContent.innerHTML = escapeHtml(data.fullContent).replace(/\n/g, '<br>');
+    // Render markdown for the full accumulated content
+    contentDiv.innerHTML = renderMarkdown(data.fullContent || '');
 
     // Handle thinking/reasoning blocks
     if (data.blocks && data.blocks.length > 0) {
@@ -361,10 +601,13 @@
 
   // Get page context
   function getPageContext() {
+    // Combine all preserved selections
+    const allSelections = preservedSelections.map(sel => sel.text).join('\n\n---\n\n');
+    
     return {
       url: window.location.href,
       title: document.title,
-      selectedText: getSelectedText(),
+      selectedText: allSelections || getSelectedText(),
       timestamp: new Date().toISOString()
     };
   }
@@ -392,6 +635,23 @@
       }
     });
   }
+
+  // Add selection change listener for real-time updates
+  let selectionChangeTimeout;
+  document.addEventListener('selectionchange', () => {
+    // Debounce selection changes to avoid excessive updates
+    clearTimeout(selectionChangeTimeout);
+    selectionChangeTimeout = setTimeout(() => {
+      if (isVisible) {
+        const selection = window.getSelection().toString().trim();
+        if (selection) {
+          // Capture new selection if it's different from existing ones
+          captureSelection();
+          updateContextChips();
+        }
+      }
+    }, 500);
+  });
 
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -452,6 +712,7 @@
     if (!sidebar) {
       sidebar = createSidebar();
       setupEventListeners();
+      detectAndApplyTheme();
     }
   });
 
@@ -467,6 +728,7 @@
     if (!sidebar) {
       sidebar = createSidebar();
       setupEventListeners();
+      detectAndApplyTheme();
     }
   }
 

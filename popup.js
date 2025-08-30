@@ -1,6 +1,9 @@
 // Popup script for LlamB Chrome Extension
 document.addEventListener('DOMContentLoaded', async () => {
   
+  // Detect if we're running in a popup window vs extension popup
+  const isStandaloneWindow = window.location.href.includes('popup.html') && !chrome.extension.getViews({ type: 'popup' }).includes(window);
+  
   // Get DOM elements
   const toggleSidebarBtn = document.getElementById('toggle-sidebar');
   const analyzePageBtn = document.getElementById('analyze-page');
@@ -85,7 +88,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function openSettings() {
     try {
       await chrome.runtime.sendMessage({ action: 'openSettings' });
-      window.close();
+      if (!isStandaloneWindow) {
+        window.close();
+      }
     } catch (error) {
       console.error('Error opening settings:', error);
       showNotification('Could not open settings');
@@ -109,7 +114,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log('LlamB: Toggle response:', response);
         
         if (response && response.success) {
-          window.close(); // Close popup after successful action
+          if (!isStandaloneWindow) {
+            window.close(); // Close popup after successful action
+          } else {
+            showNotification('Sidebar toggled successfully');
+          }
         } else {
           throw new Error(response?.error || 'Unknown error');
         }
@@ -129,7 +138,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log('LlamB: Retry response:', retryResponse);
             
             if (retryResponse && retryResponse.success) {
-              window.close();
+              if (!isStandaloneWindow) {
+                window.close();
+              } else {
+                showNotification('Sidebar toggled successfully');
+              }
             } else {
               throw new Error('Retry failed');
             }
@@ -174,7 +187,9 @@ Provide a brief summary of the page content and any key insights.`;
           });
         }, 500);
         
-        window.close();
+        if (!isStandaloneWindow) {
+          window.close();
+        }
       }
     } catch (error) {
       console.error('Error analyzing page:', error);
@@ -212,7 +227,9 @@ Provide a concise summary highlighting the main points.`;
           });
         }, 500);
         
-        window.close();
+        if (!isStandaloneWindow) {
+          window.close();
+        }
       }
     } catch (error) {
       console.error('Error summarizing selection:', error);

@@ -1,4 +1,82 @@
-/* LlamB Chat Sidebar Styles */
+/* LlamB Chat Sidebar - Modern Design */
+
+/* CSS Variables for automatic dark/light mode */
+:root {
+  --llamb-bg-primary: #ffffff;
+  --llamb-bg-secondary: #ffffff;
+  --llamb-bg-tertiary: #f9f9f9;
+  --llamb-text-primary: #0d0d0d;
+  --llamb-text-secondary: #8e8ea0;
+  --llamb-text-tertiary: #c4c4c4;
+  --llamb-border: #f0f0f0;
+  --llamb-border-light: transparent;
+  --llamb-user-bubble: #2a2a2a;
+  --llamb-user-text: #ffffff;
+  --llamb-assistant-bubble: #f6f6f6;
+  --llamb-assistant-text: #0d0d0d;
+  --llamb-shadow-sm: none;
+  --llamb-shadow-md: none;
+  --llamb-shadow-lg: none;
+  --llamb-shadow-xl: none;
+  --llamb-chip-bg: #f0f0f0;
+  --llamb-chip-text: #8e8ea0;
+  --llamb-chip-border: transparent;
+  --llamb-selection-bg: #e3f2fd;
+  --llamb-selection-text: #1976d2;
+  --llamb-selection-border: transparent;
+}
+
+/* Dark mode variables */
+[data-llamb-theme="dark"] {
+  --llamb-bg-primary: #1a1a1a;
+  --llamb-bg-secondary: #1a1a1a;
+  --llamb-bg-tertiary: #2a2a2a;
+  --llamb-text-primary: #ffffff;
+  --llamb-text-secondary: #8e8ea0;
+  --llamb-text-tertiary: #666666;
+  --llamb-border: #2a2a2a;
+  --llamb-border-light: transparent;
+  --llamb-user-bubble: #2a2a2a;
+  --llamb-user-text: #ffffff;
+  --llamb-assistant-bubble: #2a2a2a;
+  --llamb-assistant-text: #ffffff;
+  --llamb-shadow-sm: none;
+  --llamb-shadow-md: none;
+  --llamb-shadow-lg: none;
+  --llamb-shadow-xl: none;
+  --llamb-chip-bg: #2a2a2a;
+  --llamb-chip-text: #8e8ea0;
+  --llamb-chip-border: transparent;
+  --llamb-selection-bg: #404040;
+  --llamb-selection-text: #ffffff;
+  --llamb-selection-border: transparent;
+}
+
+/* Ensure sidebar inherits theme */
+#llamb-chat-sidebar[data-llamb-theme="dark"] {
+  --llamb-bg-primary: #1a1a1a;
+  --llamb-bg-secondary: #1a1a1a;
+  --llamb-bg-tertiary: #2a2a2a;
+  --llamb-text-primary: #ffffff;
+  --llamb-text-secondary: #8e8ea0;
+  --llamb-text-tertiary: #666666;
+  --llamb-border: #2a2a2a;
+  --llamb-border-light: transparent;
+  --llamb-user-bubble: #2a2a2a;
+  --llamb-user-text: #ffffff;
+  --llamb-assistant-bubble: #2a2a2a;
+  --llamb-assistant-text: #ffffff;
+  --llamb-shadow-sm: none;
+  --llamb-shadow-md: none;
+  --llamb-shadow-lg: none;
+  --llamb-shadow-xl: none;
+  --llamb-chip-bg: #2a2a2a;
+  --llamb-chip-text: #8e8ea0;
+  --llamb-chip-border: transparent;
+  --llamb-selection-bg: #404040;
+  --llamb-selection-text: #ffffff;
+  --llamb-selection-border: transparent;
+}
 
 /* Body modifications for pushing content */
 body.llamb-sidebar-open {
@@ -19,12 +97,14 @@ body.llamb-sidebar-closed {
   width: 380px;
   height: 100vh;
   z-index: 2147483647;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
-  background: #ffffff;
+  background: var(--llamb-bg-primary);
+  border-left: 1px solid var(--llamb-border);
+  display: flex;
+  flex-direction: column;
 }
 
 /* Visibility states */
@@ -38,64 +118,122 @@ body.llamb-sidebar-closed {
 
 /* Sidebar Header */
 .llamb-sidebar-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 16px 20px;
+  background: var(--llamb-bg-primary);
+  color: var(--llamb-text-primary);
+  padding: 24px 24px 16px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .llamb-sidebar-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
-  font-size: 16px;
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--llamb-text-primary);
 }
 
 .llamb-logo {
-  font-size: 20px;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
 }
 
-.llamb-sidebar-close {
-  background: rgba(255, 255, 255, 0.1);
+.llamb-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.llamb-theme-toggle, .llamb-sidebar-close {
+  background: none;
   border: none;
-  color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  color: var(--llamb-text-secondary);
+  font-size: 16px;
   cursor: pointer;
-  font-size: 20px;
-  font-weight: 300;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s;
+  border-radius: 6px;
+  transition: all 0.15s ease;
 }
 
-.llamb-sidebar-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+.llamb-theme-toggle {
+  font-size: 14px;
+}
+
+.llamb-sidebar-close {
+  font-size: 18px;
+}
+
+.llamb-theme-toggle:hover, .llamb-sidebar-close:hover {
+  background: var(--llamb-bg-tertiary);
+  color: var(--llamb-text-primary);
+}
+
+/* SVG icon styles */
+.llamb-close-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.llamb-send-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.llamb-theme-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Theme toggle icon visibility */
+/* Default: show moon icon (for switching to dark), hide sun icon */
+.llamb-theme-light-icon {
+  display: block;
+}
+
+.llamb-theme-dark-icon {
+  display: none;
+}
+
+/* In light mode: show moon icon (to switch to dark) */
+[data-llamb-theme="light"] .llamb-theme-light-icon {
+  display: none;
+}
+
+[data-llamb-theme="light"] .llamb-theme-dark-icon {
+  display: block;
+}
+
+/* In dark mode: show sun icon (to switch to light) */
+[data-llamb-theme="dark"] .llamb-theme-light-icon {
+  display: block;
+}
+
+[data-llamb-theme="dark"] .llamb-theme-dark-icon {
+  display: none;
 }
 
 /* Sidebar Content */
 .llamb-sidebar-content {
-  height: calc(100vh - 73px);
-  background: #ffffff;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* Chat Messages */
 .llamb-chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  padding: 16px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--llamb-text-tertiary) transparent;
 }
 
 .llamb-chat-messages::-webkit-scrollbar {
@@ -103,380 +241,397 @@ body.llamb-sidebar-closed {
 }
 
 .llamb-chat-messages::-webkit-scrollbar-track {
-  background: #f1f3f4;
+  background: transparent;
 }
 
 .llamb-chat-messages::-webkit-scrollbar-thumb {
-  background: #c1c8cd;
+  background: var(--llamb-text-tertiary);
   border-radius: 3px;
 }
 
 .llamb-chat-messages::-webkit-scrollbar-thumb:hover {
-  background: #a8b2ba;
+  background: var(--llamb-text-secondary);
+}
+
+/* Message Container */
+.llamb-message-container {
+  display: flex;
+  margin-bottom: 20px;
+  padding: 0 24px;
+  gap: 10px;
+}
+
+.llamb-user-container {
+  justify-content: flex-end;
+}
+
+.llamb-assistant-container {
+  justify-content: flex-start;
+}
+
+/* Message Avatar */
+.llamb-message-avatar {
+  flex-shrink: 0;
+}
+
+.llamb-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.llamb-user-avatar {
+  background: var(--llamb-user-bubble);
+  color: var(--llamb-user-text);
+}
+
+.llamb-assistant-avatar {
+  background: var(--llamb-assistant-bubble);
+  color: var(--llamb-assistant-text);
+  border: 1px solid var(--llamb-border);
 }
 
 /* Message Bubbles */
-.llamb-message {
-  display: flex;
-  flex-direction: column;
-  max-width: 85%;
+.llamb-message-bubble {
+  max-width: 280px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  position: relative;
+}
+
+.llamb-user-bubble {
+  background: var(--llamb-user-bubble);
+  color: var(--llamb-user-text);
+  border-bottom-right-radius: 4px;
+  margin-left: auto;
+}
+
+.llamb-assistant-bubble {
+  background: var(--llamb-assistant-bubble);
+  color: var(--llamb-assistant-text);
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--llamb-border-light);
+}
+
+.llamb-user-container .llamb-message-avatar {
+  order: 2;
+}
+
+.llamb-user-container .llamb-message-bubble {
+  order: 1;
+}
+
+/* Message Content */
+.llamb-message-content {
+  line-height: 1.5;
   word-wrap: break-word;
 }
 
-.llamb-user-message {
-  align-self: flex-end;
+.llamb-message-content p {
+  margin: 0 0 8px 0;
 }
 
-.llamb-assistant-message {
-  align-self: flex-start;
+.llamb-message-content p:last-child {
+  margin-bottom: 0;
 }
 
-.llamb-message-content {
-  padding: 12px 16px;
-  border-radius: 16px;
-  margin-bottom: 4px;
+/* Markdown Styles */
+.llamb-message-content h1,
+.llamb-message-content h2,
+.llamb-message-content h3 {
+  margin: 12px 0 8px 0;
+  font-weight: 600;
 }
 
-.llamb-user-message .llamb-message-content {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-bottom-right-radius: 4px;
+.llamb-message-content h1 {
+  font-size: 18px;
 }
 
-.llamb-assistant-message .llamb-message-content {
-  background: #f1f3f4;
-  color: #202124;
-  border-bottom-left-radius: 4px;
-  border: 1px solid #e8eaed;
+.llamb-message-content h2 {
+  font-size: 16px;
 }
 
-.llamb-message-meta {
+.llamb-message-content h3 {
+  font-size: 15px;
+}
+
+.llamb-message-content strong {
+  font-weight: 600;
+}
+
+.llamb-message-content em {
+  font-style: italic;
+}
+
+.llamb-message-content a {
+  color: var(--llamb-user-bubble);
+  text-decoration: none;
+}
+
+.llamb-message-content a:hover {
+  text-decoration: underline;
+}
+
+.llamb-message-content ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.llamb-message-content li {
+  margin: 4px 0;
+}
+
+/* Code Styles */
+.llamb-message-content code.llamb-inline-code {
+  background: var(--llamb-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--llamb-text-primary);
+}
+
+.llamb-message-content pre.llamb-code-block {
+  background: var(--llamb-bg-tertiary);
+  border: 1px solid var(--llamb-border-light);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+  position: relative;
+}
+
+.llamb-message-content pre.llamb-code-block::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 8px;
+  right: 8px;
   font-size: 11px;
-  color: #5f6368;
-  padding: 0 8px;
-  align-self: flex-start;
+  color: var(--llamb-text-tertiary);
+  text-transform: uppercase;
+  font-weight: 500;
 }
 
-.llamb-user-message .llamb-message-meta {
-  align-self: flex-end;
+.llamb-message-content pre.llamb-code-block code {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--llamb-text-primary);
+  display: block;
+  white-space: pre;
+  background: none;
+  padding: 0;
+  margin: 0;
 }
 
-/* Context Info */
-.llamb-context-info {
-  padding: 12px 20px;
-  background: #f8f9fa;
-  border-top: 1px solid #e8eaed;
+/* Streaming indicator */
+.llamb-message-streaming::after {
+  content: '●';
+  animation: llamb-pulse 1.4s infinite;
+  color: var(--llamb-text-tertiary);
+  margin-left: 4px;
+}
+
+@keyframes llamb-pulse {
+  0%, 44% { opacity: 1; }
+  45%, 55% { opacity: 0.3; }
+  56%, 100% { opacity: 1; }
+}
+
+/* Error messages */
+.llamb-error-message {
+  color: #ef4444;
+  font-size: 13px;
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+/* Chat Input Container */
+.llamb-chat-input-container {
+  background: var(--llamb-bg-primary);
+}
+
+/* Context Chips */
+.llamb-context-chips {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  padding: 16px 24px 16px 24px;
+  background: var(--llamb-bg-primary);
+}
+
+.llamb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--llamb-chip-bg);
+  border-radius: 12px;
   font-size: 12px;
-  color: #5f6368;
+  color: var(--llamb-chip-text);
+  max-width: 200px;
+  min-height: 32px;
+  font-family: inherit;
+  font-weight: 400;
 }
 
-.llamb-context-indicator {
+.llamb-chip-icon {
   font-size: 14px;
+  flex-shrink: 0;
 }
 
-.llamb-context-text {
-  flex: 1;
+.llamb-chip-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  font-weight: 500;
 }
 
-/* Chat Input */
-.llamb-chat-input-container {
-  border-top: 1px solid #e8eaed;
-  background: white;
+.llamb-chip-selection {
+  background: var(--llamb-selection-bg);
+  border-color: var(--llamb-selection-border);
+  color: var(--llamb-selection-text);
 }
 
+.llamb-chip-close {
+  margin-left: 4px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.7;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.llamb-chip-close:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Clear All Button */
+.llamb-clear-all-btn {
+  background: none;
+  border: none;
+  border-radius: 12px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--llamb-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  margin-left: auto;
+  transition: all 0.15s ease;
+  font-weight: 400;
+}
+
+.llamb-clear-all-btn:hover {
+  background: var(--llamb-bg-tertiary);
+  color: var(--llamb-text-primary);
+}
+
+/* Input Area */
 .llamb-input-wrapper {
-  padding: 16px 20px;
+  padding: 16px 24px 24px 24px;
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
 }
 
 #llamb-chat-input {
   flex: 1;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--llamb-border);
   border-radius: 20px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   font-size: 14px;
   font-family: inherit;
   resize: none;
   outline: none;
   min-height: 20px;
-  max-height: 80px;
-  transition: border-color 0.2s;
+  max-height: 100px;
+  background: var(--llamb-bg-tertiary);
+  color: var(--llamb-text-primary);
+  transition: all 0.2s;
+  line-height: 1.4;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Hide scrollbar for webkit browsers */
+#llamb-chat-input::-webkit-scrollbar {
+  display: none;
 }
 
 #llamb-chat-input:focus {
-  border-color: #667eea;
+  border-color: var(--llamb-user-bubble);
+  box-shadow: 0 0 0 3px rgba(42, 42, 42, 0.1);
 }
 
 #llamb-chat-input::placeholder {
-  color: #9aa0a6;
+  color: var(--llamb-text-tertiary);
 }
 
 .llamb-send-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--llamb-user-bubble);
   border: none;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   color: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: all 0.2s;
+  font-size: 14px;
 }
 
 .llamb-send-btn:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: var(--llamb-shadow-md);
 }
 
 .llamb-send-btn:active {
   transform: scale(0.95);
 }
 
-/* Toggle Button */
+.llamb-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Toggle Button - Hidden since we use direct click */
 .llamb-sidebar-toggle {
-  position: fixed;
-  top: 50%;
-  right: 20px;
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 2147483646;
-  transform: translateY(-50%);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
-  color: white;
+  display: none;
 }
 
-.llamb-sidebar-visible .llamb-sidebar-toggle {
-  display: none !important;
-}
-
-.llamb-sidebar-toggle:hover {
-  transform: translateY(-50%) scale(1.1);
-  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
-  opacity: 1;
-}
-
-.llamb-sidebar-toggle:active {
-  transform: translateY(-50%) scale(0.95);
-}
-
-@media (max-width: 768px) {
-  .llamb-sidebar-visible .llamb-sidebar-toggle {
-    display: none;
-  }
-}
-
-/* Mobile Responsiveness */
-@media (max-width: 768px) {
+/* Responsive adjustments */
+@media (max-width: 480px) {
   #llamb-chat-sidebar {
     width: 100vw;
-    right: 0;
   }
   
   body.llamb-sidebar-open {
-    margin-right: 100vw !important;
-    width: 0 !important;
+    margin-right: 0 !important;
   }
   
-  body.llamb-sidebar-open > * {
-    max-width: 0 !important;
-  }
-  
-  .llamb-sidebar-toggle {
-    right: 16px;
-    width: 48px;
-    height: 48px;
-  }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .llamb-sidebar-content {
-    background: #1a1a1a;
-    color: #e8eaed;
-  }
-  
-  .llamb-assistant-message .llamb-message-content {
-    background: #2d2d30;
-    color: #e8eaed;
-    border-color: #404040;
-  }
-  
-  .llamb-context-info {
-    background: #2d2d30;
-    border-color: #404040;
-    color: #9aa0a6;
-  }
-  
-  .llamb-chat-input-container {
-    background: #1a1a1a;
-    border-color: #404040;
-  }
-  
-  #llamb-chat-input {
-    background: #2d2d30;
-    color: #e8eaed;
-    border-color: #404040;
-  }
-  
-  #llamb-chat-input::placeholder {
-    color: #9aa0a6;
-  }
-  
-  .llamb-chat-messages::-webkit-scrollbar-track {
-    background: #2d2d30;
-  }
-}
-
-/* Animation for message appearance */
-.llamb-message {
-  animation: slideInMessage 0.3s ease-out;
-}
-
-@keyframes slideInMessage {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Streaming and typing indicator */
-.llamb-typing-indicator {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0;
-}
-
-.llamb-typing-indicator span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #9aa0a6;
-  animation: typing 1.5s ease-in-out infinite;
-}
-
-.llamb-typing-indicator span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.llamb-typing-indicator span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes typing {
-  0%, 60%, 100% {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-  30% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Thinking/Reasoning blocks */
-.llamb-blocks-container {
-  margin-bottom: 16px;
-}
-
-.llamb-block {
-  margin-bottom: 12px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #e8eaed;
-  background: #f8f9fa;
-}
-
-.llamb-thinking-block {
-  border-left: 4px solid #fbbc04;
-}
-
-.llamb-reasoning-block {
-  border-left: 4px solid #4285f4;
-}
-
-.llamb-reflection-block {
-  border-left: 4px solid #34a853;
-}
-
-.llamb-block-header {
-  padding: 8px 12px;
-  background: rgba(0,0,0,0.03);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #5f6368;
-}
-
-.llamb-block-emoji {
-  font-size: 14px;
-}
-
-.llamb-block-content {
-  padding: 12px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: #202124;
-  background: white;
-}
-
-/* Error messages */
-.llamb-error-message {
-  color: #ea4335;
-  background: #fce8e6;
-  padding: 12px;
-  border-radius: 6px;
-  border-left: 4px solid #ea4335;
-  font-size: 13px;
-}
-
-/* Dark mode support for new elements */
-@media (prefers-color-scheme: dark) {
-  .llamb-typing-indicator span {
-    background: #9aa0a6;
-  }
-  
-  .llamb-block {
-    background: #2d2d30;
-    border-color: #404040;
-  }
-  
-  .llamb-block-header {
-    background: rgba(255,255,255,0.05);
-    color: #9aa0a6;
-  }
-  
-  .llamb-block-content {
-    background: #2d2d30;
-    color: #e8eaed;
-  }
-  
-  .llamb-error-message {
-    background: rgba(234, 67, 53, 0.1);
-    color: #f28b82;
-    border-color: #f28b82;
+  .llamb-message-bubble {
+    max-width: 240px;
   }
 }
