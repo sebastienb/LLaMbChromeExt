@@ -13,6 +13,13 @@
   let preservedSelections = []; // Array to store multiple selections
   let selectionCounter = 0;
 
+  // Cache for page content to avoid re-extraction
+  let pageContentCache = {
+    url: null,
+    content: null,
+    timestamp: null
+  };
+
   // Theme management
   let currentTheme = null;
 
@@ -101,6 +108,244 @@
     return text.length > maxLength 
       ? text.substring(0, maxLength) + '...' 
       : text;
+  }
+
+  // HTML to Markdown converter
+  function htmlToMarkdown(element) {
+    if (!element) return '';
+    
+    // Handle text nodes
+    if (element.nodeType === Node.TEXT_NODE) {
+      return element.textContent.trim();
+    }
+    
+    // Skip script, style, and other non-content elements
+    if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'META', 'LINK'].includes(element.tagName)) {
+      return '';
+    }
+    
+    let markdown = '';
+    const tagName = element.tagName?.toLowerCase();
+    
+    switch (tagName) {
+      case 'h1':
+        markdown = `# ${element.textContent.trim()}\n\n`;
+        break;
+      case 'h2':
+        markdown = `## ${element.textContent.trim()}\n\n`;
+        break;
+      case 'h3':
+        markdown = `### ${element.textContent.trim()}\n\n`;
+        break;
+      case 'h4':
+        markdown = `#### ${element.textContent.trim()}\n\n`;
+        break;
+      case 'h5':
+        markdown = `##### ${element.textContent.trim()}\n\n`;
+        break;
+      case 'h6':
+        markdown = `###### ${element.textContent.trim()}\n\n`;
+        break;
+      case 'p':
+        const pContent = Array.from(element.childNodes).map(child => htmlToMarkdown(child)).join('');
+        markdown = pContent.trim() ? `${pContent.trim()}\n\n` : '';
+        break;
+      case 'br':
+        markdown = '\n';
+        break;
+      case 'strong':
+      case 'b':
+        markdown = `**${element.textContent.trim()}**`;
+        break;
+      case 'em':
+      case 'i':
+        markdown = `*${element.textContent.trim()}*`;
+        break;
+      case 'code':
+        markdown = `\`${element.textContent.trim()}\``;
+        break;
+      case 'pre':
+        const codeElement = element.querySelector('code');
+        const codeText = codeElement ? codeElement.textContent : element.textContent;
+        markdown = `\`\`\`\n${codeText.trim()}\n\`\`\`\n\n`;
+        break;
+      case 'a':
+        const href = element.getAttribute('href');
+        const linkText = element.textContent.trim();
+        if (href && linkText) {
+          // Convert relative URLs to absolute
+          const absoluteUrl = href.startsWith('http') ? href : new URL(href, window.location.href).href;
+          markdown = `[${linkText}](${absoluteUrl})`;
+        } else {
+          markdown = linkText;
+        }
+        break;
+      case 'img':
+        const src = element.getAttribute('src');
+        const alt = element.getAttribute('alt') || '';
+        if (src) {
+          const absoluteSrc = src.startsWith('http') ? src : new URL(src, window.location.href).href;
+          markdown = `![${alt}](${absoluteSrc})\n\n`;
+        }
+        break;
+      case 'ul':
+      case 'ol':
+        const listItems = Array.from(element.children).filter(child => child.tagName === 'LI');
+        listItems.forEach((li, index) => {
+          const prefix = tagName === 'ul' ? '- ' : `${index + 1}. `;
+          const itemContent = Array.from(li.childNodes).map(child => htmlToMarkdown(child)).join('');
+          markdown += `${prefix}${itemContent.trim()}\n`;
+        });
+        markdown += '\n';
+        break;
+      case 'blockquote':
+        const quoteContent = Array.from(element.childNodes).map(child => htmlToMarkdown(child)).join('');
+        markdown = quoteContent.split('\n').map(line => `> ${line}`).join('\n') + '\n\n';
+        break;
+      case 'table':
+        // Simple table conversion - just extract text content
+        const rows = Array.from(element.querySelectorAll('tr'));
+        rows.forEach((row, rowIndex) => {
+          const cells = Array.from(row.querySelectorAll('td, th'));
+          const cellTexts = cells.map(cell => cell.textContent.trim());
+          markdown += `| ${cellTexts.join(' | ')} |\n`;
+          
+          // Add header separator after first row
+          if (rowIndex === 0 && cells.length > 0) {
+            markdown += `|${' --- |'.repeat(cells.length)}\n`;
+          }
+        });
+        markdown += '\n';
+        break;
+      default:
+        // For other elements, process children
+        Array.from(element.childNodes).forEach(child => {
+          markdown += htmlToMarkdown(child);
+        });
+        break;
+    }
+    
+    return markdown;
+  }
+
+  // Smart content extraction function
+  function extractPageContent() {
+    try {
+      // Check cache first (valid for 5 minutes)
+      const currentUrl = window.location.href;
+      const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+      
+      if (pageContentCache.url === currentUrl && 
+          pageContentCache.content &&
+          pageContentCache.timestamp &&
+          (Date.now() - pageContentCache.timestamp) < cacheExpiry) {
+        return pageContentCache.content;
+      }
+
+      // Performance check - don't extract from very large pages
+      const bodyText = document.body?.textContent || '';
+      if (bodyText.length > 100000) {
+        console.log('LlamB: Page too large, using truncated content');
+        const truncatedContent = bodyText.substring(0, 20000) + '\n\n[Content truncated - page too large]';
+        
+        // Cache the result
+        pageContentCache = {
+          url: currentUrl,
+          content: truncatedContent,
+          timestamp: Date.now()
+        };
+        
+        return truncatedContent;
+      }
+      // Try to find main content areas in order of preference
+      const contentSelectors = [
+        'article',
+        'main',
+        '[role="main"]',
+        '.content',
+        '.main-content',
+        '.post-content',
+        '.entry-content',
+        '.article-content',
+        '#content',
+        '#main',
+        '.container .content',
+        'body'
+      ];
+
+      let mainContent = null;
+
+      // Find the first matching content area
+      for (const selector of contentSelectors) {
+        const element = document.querySelector(selector);
+        if (element && element.textContent.trim().length > 100) {
+          mainContent = element;
+          break;
+        }
+      }
+
+      if (!mainContent) {
+        mainContent = document.body;
+      }
+
+      // Clone the element to avoid modifying the original
+      const contentClone = mainContent.cloneNode(true);
+
+      // Remove unwanted elements
+      const unwantedSelectors = [
+        'nav', 'header', 'footer', 'aside',
+        '.navigation', '.nav', '.menu',
+        '.header', '.footer', '.sidebar',
+        '.ads', '.advertisement', '.banner',
+        '.social', '.share', '.sharing',
+        '.comments', '.comment-form',
+        '.related-posts', '.recommended',
+        '.popup', '.modal', '.overlay',
+        'script', 'style', 'noscript',
+        '[aria-hidden="true"]',
+        '.hidden', '.visually-hidden',
+        '#llamb-chat-sidebar' // Remove our own sidebar
+      ];
+
+      unwantedSelectors.forEach(selector => {
+        const elements = contentClone.querySelectorAll(selector);
+        elements.forEach(el => el.remove());
+      });
+
+      // Convert to markdown
+      let markdown = htmlToMarkdown(contentClone);
+
+      // Clean up the markdown
+      markdown = markdown
+        // Remove excessive newlines
+        .replace(/\n{3,}/g, '\n\n')
+        // Remove leading/trailing whitespace
+        .trim()
+        // Remove empty lines at the start
+        .replace(/^\n+/, '')
+        // Remove excessive spaces
+        .replace(/ {2,}/g, ' ');
+
+      // Limit content size (approximately 5000 words)
+      const maxWords = 5000;
+      const words = markdown.split(/\s+/);
+      if (words.length > maxWords) {
+        markdown = words.slice(0, maxWords).join(' ') + '\n\n[Content truncated due to length]';
+      }
+
+      // Cache the result
+      pageContentCache = {
+        url: currentUrl,
+        content: markdown,
+        timestamp: Date.now()
+      };
+
+      return markdown;
+    } catch (error) {
+      console.error('LlamB: Error extracting page content:', error);
+      // Fallback to simple text extraction
+      return document.body?.textContent?.trim().substring(0, 10000) || '';
+    }
   }
 
   // Simple markdown renderer
@@ -608,6 +853,7 @@
       url: window.location.href,
       title: document.title,
       selectedText: allSelections || getSelectedText(),
+      markdownContent: extractPageContent(),
       timestamp: new Date().toISOString()
     };
   }
@@ -705,6 +951,20 @@
 
   // Initialize body with default class
   document.body.classList.add('llamb-sidebar-closed');
+
+  // Clear content cache when URL changes
+  let lastUrl = window.location.href;
+  new MutationObserver(() => {
+    const currentUrl = window.location.href;
+    if (currentUrl !== lastUrl) {
+      lastUrl = currentUrl;
+      pageContentCache = {
+        url: null,
+        content: null,
+        timestamp: null
+      };
+    }
+  }).observe(document, { subtree: true, childList: true });
 
   // Initialize
   document.addEventListener('DOMContentLoaded', () => {

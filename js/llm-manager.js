@@ -223,11 +223,14 @@ class LLMManager {
       contextText += `Selected text: "${pageContext.selectedText}"\n`;
     }
     
-    if (pageContext.visibleText) {
+    // Use markdown content if available, otherwise fall back to visibleText
+    if (pageContext.markdownContent) {
+      contextText += `\nPage content in markdown format:\n\`\`\`markdown\n${pageContext.markdownContent}\n\`\`\`\n`;
+    } else if (pageContext.visibleText) {
       contextText += `Visible content: ${pageContext.visibleText.substring(0, 2000)}${pageContext.visibleText.length > 2000 ? '...' : ''}\n`;
     }
     
-    contextText += '\nPlease consider this context when responding.';
+    contextText += '\nPlease consider this context when responding to the user\'s question.';
     return contextText;
   }
 
