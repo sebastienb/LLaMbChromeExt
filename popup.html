@@ -190,23 +190,21 @@
             <h3>Settings</h3>
             
             <div class="setting-item">
-                <label for="model-select">AI Model</label>
-                <select id="model-select">
-                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                    <option value="gpt-4">GPT-4</option>
-                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
-                    <option value="claude-3-opus">Claude 3 Opus</option>
+                <label for="connection-select">Active Connection</label>
+                <select id="connection-select">
+                    <option value="">No connections configured</option>
                 </select>
             </div>
 
             <div class="setting-item">
-                <label for="api-key">API Key</label>
-                <input type="password" id="api-key" placeholder="Enter your API key...">
+                <button class="action-button" id="manage-connections-btn">
+                    ⚙️ Manage Connections
+                </button>
             </div>
 
             <div class="status-indicator" id="connection-status">
                 <div class="status-dot"></div>
-                <span>Ready to connect</span>
+                <span>Loading...</span>
             </div>
         </div>
     </div>

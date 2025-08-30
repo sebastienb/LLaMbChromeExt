@@ -5,64 +5,90 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleSidebarBtn = document.getElementById('toggle-sidebar');
   const analyzePageBtn = document.getElementById('analyze-page');
   const summarizeSelectionBtn = document.getElementById('summarize-selection');
-  const modelSelect = document.getElementById('model-select');
-  const apiKeyInput = document.getElementById('api-key');
+  const connectionSelect = document.getElementById('connection-select');
+  const manageConnectionsBtn = document.getElementById('manage-connections-btn');
   const connectionStatus = document.getElementById('connection-status');
 
-  // Load saved settings
-  loadSettings();
+  // Load connections and settings
+  loadConnections();
 
   // Event listeners
   toggleSidebarBtn.addEventListener('click', toggleSidebar);
   analyzePageBtn.addEventListener('click', analyzePage);
   summarizeSelectionBtn.addEventListener('click', summarizeSelection);
-  modelSelect.addEventListener('change', saveSettings);
-  apiKeyInput.addEventListener('input', debounce(saveSettings, 500));
+  connectionSelect.addEventListener('change', changeActiveConnection);
+  manageConnectionsBtn.addEventListener('click', openSettings);
 
-  // Load settings from storage
-  async function loadSettings() {
+  // Load connections from background
+  async function loadConnections() {
     try {
-      const result = await chrome.storage.sync.get([
-        'selectedModel',
-        'apiKey',
-        'sidebarEnabled',
-        'autoContextCapture'
-      ]);
-
-      if (result.selectedModel) {
-        modelSelect.value = result.selectedModel;
-      }
-
-      if (result.apiKey) {
-        apiKeyInput.value = result.apiKey;
-        updateConnectionStatus(true);
+      const response = await chrome.runtime.sendMessage({ action: 'getLLMConnections' });
+      
+      if (response.success) {
+        populateConnectionSelect(response.connections, response.activeConnectionId);
+        updateConnectionStatus(response.connections, response.activeConnectionId);
       } else {
-        updateConnectionStatus(false);
+        console.error('Failed to load connections:', response.error);
+        updateConnectionStatus([], null);
       }
-
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error('Error loading connections:', error);
+      updateConnectionStatus([], null);
     }
   }
 
-  // Save settings to storage
-  async function saveSettings() {
-    try {
-      const settings = {
-        selectedModel: modelSelect.value,
-        apiKey: apiKeyInput.value,
-        sidebarEnabled: true,
-        autoContextCapture: true
-      };
+  // Populate connection dropdown
+  function populateConnectionSelect(connections, activeConnectionId) {
+    connectionSelect.innerHTML = '';
+    
+    if (connections.length === 0) {
+      connectionSelect.innerHTML = '<option value="">No connections configured</option>';
+      connectionSelect.disabled = true;
+      return;
+    }
 
-      await chrome.storage.sync.set(settings);
-      
-      // Update connection status based on API key
-      updateConnectionStatus(!!apiKeyInput.value);
-      
-      console.log('Settings saved');
+    connectionSelect.disabled = false;
+    
+    connections.forEach(connection => {
+      const option = document.createElement('option');
+      option.value = connection.id;
+      option.textContent = `${connection.name} (${connection.model})`;
+      option.selected = connection.id === activeConnectionId;
+      connectionSelect.appendChild(option);
+    });
+  }
+
+  // Change active connection
+  async function changeActiveConnection() {
+    const connectionId = connectionSelect.value;
+    if (!connectionId) return;
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'setActiveConnection',
+        connectionId: connectionId
+      });
+
+      if (response.success) {
+        updateConnectionStatus([response.connection], connectionId);
+        showNotification('Active connection updated');
+      } else {
+        showNotification('Failed to update connection');
+      }
     } catch (error) {
-      console.error('Error saving settings:', error);
+      console.error('Error changing active connection:', error);
+      showNotification('Error updating connection');
+    }
+  }
+
+  // Open settings page
+  async function openSettings() {
+    try {
+      await chrome.runtime.sendMessage({ action: 'openSettings' });
+      window.close();
+    } catch (error) {
+      console.error('Error opening settings:', error);
+      showNotification('Could not open settings');
     }
   }
 
@@ -195,15 +221,24 @@ Provide a concise summary highlighting the main points.`;
   }
 
   // Update connection status indicator
-  function updateConnectionStatus(connected) {
+  function updateConnectionStatus(connections, activeConnectionId) {
     const statusText = connectionStatus.querySelector('span');
     
-    if (connected) {
-      connectionStatus.className = 'status-indicator';
-      statusText.textContent = 'API key configured';
+    if (connections.length === 0) {
+      connectionStatus.className = 'status-indicator disconnected';
+      statusText.textContent = 'No connections configured';
+    } else if (activeConnectionId) {
+      const activeConnection = connections.find(c => c.id === activeConnectionId);
+      if (activeConnection && activeConnection.enabled) {
+        connectionStatus.className = 'status-indicator';
+        statusText.textContent = `Connected: ${activeConnection.name}`;
+      } else {
+        connectionStatus.className = 'status-indicator disconnected';
+        statusText.textContent = 'Active connection disabled';
+      }
     } else {
       connectionStatus.className = 'status-indicator disconnected';
-      statusText.textContent = 'API key required';
+      statusText.textContent = 'No active connection';
     }
   }
 

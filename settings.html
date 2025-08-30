@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>LlamB Settings - Connection Management</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header .subtitle {
+            margin: 8px 0 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e8eaed;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #202124;
+            margin: 0;
+        }
+
+        .section-content {
+            padding: 24px;
+        }
+
+        /* Connection Cards */
+        .connection-list {
+            display: grid;
+            gap: 16px;
+        }
+
+        .connection-card {
+            border: 1px solid #e8eaed;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            transition: all 0.2s;
+        }
+
+        .connection-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .connection-card.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea08 0%, #764ba208 100%);
+        }
+
+        .connection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .connection-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #202124;
+            margin: 0;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.enabled { background: #34a853; }
+        .status-dot.disabled { background: #ea4335; }
+        .status-dot.testing { background: #fbbc04; animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .connection-details {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 8px 16px;
+            font-size: 13px;
+            color: #5f6368;
+            margin-bottom: 16px;
+        }
+
+        .connection-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid #e8eaed;
+            border-radius: 6px;
+            background: white;
+            color: #5f6368;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: #f8f9fa;
+            border-color: #dadce0;
+        }
+
+        .btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+
+        .btn.primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn.danger {
+            color: #ea4335;
+            border-color: #ea4335;
+        }
+
+        .btn.danger:hover {
+            background: #fce8e6;
+        }
+
+        /* Form */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .form-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 6px;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            padding: 10px 12px;
+            border: 1px solid #dadce0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .checkbox {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            transform: translateY(20px);
+            transition: all 0.3s;
+        }
+
+        .modal-overlay.active .modal {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            padding: 24px 24px 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #202124;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #5f6368;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .modal-content {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            padding: 0 24px 24px 24px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: #5f6368;
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: #202124;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            z-index: 2000;
+            transform: translateX(100%);
+            transition: all 0.3s;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success { background: #34a853; }
+        .toast.error { background: #ea4335; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 16px;
+            }
+            
+            .modal {
+                width: 95%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🦙 LlamB Settings</h1>
+        <div class="subtitle">Manage your LLM connections and preferences</div>
+    </div>
+
+    <div class="container">
+        <!-- Connections Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">LLM Connections</h2>
+                <button class="btn primary" id="add-connection-btn">
+                    ➕ Add Connection
+                </button>
+            </div>
+            <div class="section-content">
+                <div id="connections-container">
+                    <div class="empty-state" id="empty-state">
+                        <div class="icon">🔗</div>
+                        <h3>No connections configured</h3>
+                        <p>Add your first LLM connection to get started</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Settings Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Global Settings</h2>
+            </div>
+            <div class="section-content">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Theme</label>
+                        <select class="form-select" id="theme-select">
+                            <option value="auto">Auto (System)</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Max Tokens</label>
+                        <input type="number" class="form-input" id="max-tokens" min="100" max="32000" value="4000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Temperature</label>
+                        <input type="number" class="form-input" id="temperature" min="0" max="2" step="0.1" value="0.7">
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" class="checkbox" id="auto-context">
+                            <label for="auto-context">Auto capture page context</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" class="checkbox" id="streaming-enabled">
+                            <label for="streaming-enabled">Enable streaming responses</label>
+                        </div>
+                        <div class="checkbox-group">
+                            <input type="checkbox" class="checkbox" id="show-thinking">
+                            <label for="show-thinking">Show thinking/reasoning blocks</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import/Export Section -->
+        <div class="section">
+            <div class="section-header">
+                <h2 class="section-title">Backup & Restore</h2>
+            </div>
+            <div class="section-content">
+                <div style="display: flex; gap: 16px; align-items: center;">
+                    <button class="btn" id="export-settings-btn">📤 Export Settings</button>
+                    <button class="btn" id="import-settings-btn">📥 Import Settings</button>
+                    <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Modal -->
+    <div class="modal-overlay" id="connection-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Add Connection</h3>
+                <button class="modal-close" id="modal-close-btn">×</button>
+            </div>
+            <div class="modal-content">
+                <form id="connection-form">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Connection Name</label>
+                            <input type="text" class="form-input" id="connection-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Type</label>
+                            <select class="form-select" id="connection-type" required>
+                                <option value="openai-compatible">OpenAI Compatible</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic (Coming Soon)</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Endpoint URL</label>
+                            <input type="url" class="form-input" id="connection-endpoint" required 
+                                   placeholder="http://localhost:11434/v1 or https://api.openai.com/v1">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">API Key (Optional)</label>
+                            <input type="password" class="form-input" id="connection-api-key" 
+                                   placeholder="Leave empty for local models">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Model</label>
+                            <div style="display: flex; gap: 8px;">
+                                <select class="form-select" id="connection-model-select" style="flex: 1;">
+                                    <option value="">Select a model...</option>
+                                </select>
+                                <button type="button" class="btn" id="fetch-models-btn" style="white-space: nowrap;">
+                                    🔄 Fetch Models
+                                </button>
+                            </div>
+                            <input type="text" class="form-input" id="connection-model-input" 
+                                   placeholder="Or type custom model name..." style="margin-top: 8px;">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Context Window</label>
+                            <input type="number" class="form-input" id="context-window" min="1024" max="1000000" value="4096">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Timeout (ms)</label>
+                            <input type="number" class="form-input" id="connection-timeout" min="5000" max="300000" value="30000">
+                        </div>
+                        <div class="form-group full-width">
+                            <div class="checkbox-group">
+                                <input type="checkbox" class="checkbox" id="feature-streaming" checked>
+                                <label for="feature-streaming">Streaming Support</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" class="checkbox" id="feature-reasoning">
+                                <label for="feature-reasoning">Reasoning Blocks</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" class="checkbox" id="feature-thinking">
+                                <label for="feature-thinking">Thinking Blocks</label>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" class="checkbox" id="connection-enabled" checked>
+                                <label for="connection-enabled">Enabled</label>
+                            </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Custom Headers (JSON)</label>
+                            <textarea class="form-textarea" id="custom-headers" 
+                                      placeholder='{"Custom-Header": "value"}'></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" id="test-connection-btn">🧪 Test Connection</button>
+                <button type="button" class="btn" id="cancel-btn">Cancel</button>
+                <button type="submit" class="btn primary" form="connection-form" id="save-connection-btn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/storage-manager.js"></script>
+    <script src="settings.js"></script>
+</body>
+</html>

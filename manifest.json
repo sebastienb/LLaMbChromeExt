@@ -38,7 +38,15 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["sidebar.html", "sidebar.js"],
+      "resources": [
+        "sidebar.html", 
+        "sidebar.js",
+        "settings.html",
+        "js/storage-manager.js",
+        "js/llm-manager.js",
+        "js/llm-providers.js",
+        "js/stream-parser.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

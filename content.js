@@ -144,18 +144,28 @@
   }
 
   // Send message function
-  function sendMessage() {
+  async function sendMessage() {
+    console.log('LlamB: sendMessage called');
     const chatInput = document.getElementById('llamb-chat-input');
     const messagesContainer = document.getElementById('llamb-messages');
     const message = chatInput.value.trim();
 
-    if (!message) return;
+    console.log('LlamB: Message content:', message);
+    if (!message) {
+      console.log('LlamB: Empty message, returning');
+      return;
+    }
+
+    // Disable input while processing
+    chatInput.disabled = true;
+    const sendBtn = document.getElementById('llamb-send-btn');
+    sendBtn.disabled = true;
 
     // Add user message
     const userMessageDiv = document.createElement('div');
     userMessageDiv.className = 'llamb-message llamb-user-message';
     userMessageDiv.innerHTML = `
-      <div class="llamb-message-content">${message}</div>
+      <div class="llamb-message-content">${escapeHtml(message)}</div>
       <div class="llamb-message-meta">You</div>
     `;
     messagesContainer.appendChild(userMessageDiv);
@@ -167,26 +177,181 @@
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    // Add placeholder response (will be replaced with actual LLM integration)
-    setTimeout(() => {
-      const assistantMessageDiv = document.createElement('div');
-      assistantMessageDiv.className = 'llamb-message llamb-assistant-message';
-      assistantMessageDiv.innerHTML = `
-        <div class="llamb-message-content">
-          I can see you're on "${document.title}" (${window.location.href}). 
-          LLM integration is coming soon! For now, I can help you understand that this extension successfully:
-          <br><br>
-          • Accesses the current webpage
-          • Shows a chat interface
-          • Captures your messages
-          <br><br>
-          Selected text: "${getSelectedText() || 'None'}"
+    // Create assistant message placeholder for streaming
+    const assistantMessageDiv = document.createElement('div');
+    assistantMessageDiv.className = 'llamb-message llamb-assistant-message';
+    assistantMessageDiv.innerHTML = `
+      <div class="llamb-message-content llamb-message-streaming">
+        <div class="llamb-typing-indicator">
+          <span></span>
+          <span></span>
+          <span></span>
         </div>
-        <div class="llamb-message-meta">Assistant</div>
+      </div>
+      <div class="llamb-message-meta">Assistant</div>
+    `;
+    messagesContainer.appendChild(assistantMessageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    try {
+      console.log('LlamB: Sending message:', message);
+      
+      // Get page context
+      const pageContext = getPageContext();
+      console.log('LlamB: Page context:', pageContext);
+      
+      // Send to background script for LLM processing
+      console.log('LlamB: Sending to background...');
+      const response = await chrome.runtime.sendMessage({
+        action: 'sendChatMessage',
+        message: message,
+        pageContext: pageContext,
+        options: {
+          streaming: true,
+          includeContext: true
+        }
+      });
+
+      console.log('LlamB: Response from background:', response);
+
+      if (!response || !response.success) {
+        throw new Error(response?.error || 'Failed to send message');
+      }
+
+      console.log('LlamB: Message sent, requestId:', response.requestId);
+      
+      // Store requestId for tracking streaming updates
+      assistantMessageDiv.dataset.requestId = response.requestId;
+
+    } catch (error) {
+      console.error('LlamB: Error sending message:', error);
+      
+      // Show error message
+      const contentDiv = assistantMessageDiv.querySelector('.llamb-message-content');
+      contentDiv.innerHTML = `
+        <div class="llamb-error-message">
+          ❌ Error: ${escapeHtml(error.message)}
+          <br><br>
+          <small>Make sure you have configured an LLM connection in settings.</small>
+        </div>
       `;
-      messagesContainer.appendChild(assistantMessageDiv);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }, 1000);
+      
+      // Re-enable input
+      chatInput.disabled = false;
+      sendBtn.disabled = false;
+      chatInput.focus();
+    }
+  }
+
+  // Handle streaming chunk updates
+  function handleStreamChunk(data) {
+    const assistantMessage = document.querySelector(`[data-request-id="${data.requestId}"]`);
+    if (!assistantMessage) return;
+
+    const contentDiv = assistantMessage.querySelector('.llamb-message-content');
+    
+    // Remove typing indicator on first chunk
+    if (contentDiv.classList.contains('llamb-message-streaming')) {
+      contentDiv.classList.remove('llamb-message-streaming');
+      contentDiv.innerHTML = '';
+    }
+
+    // Update content with streaming text
+    const textContent = contentDiv.querySelector('.llamb-text-content') || document.createElement('div');
+    if (!textContent.parentNode) {
+      textContent.className = 'llamb-text-content';
+      contentDiv.appendChild(textContent);
+    }
+
+    // Escape and append new content
+    textContent.innerHTML = escapeHtml(data.fullContent).replace(/\n/g, '<br>');
+
+    // Handle thinking/reasoning blocks
+    if (data.blocks && data.blocks.length > 0) {
+      const blocksContainer = contentDiv.querySelector('.llamb-blocks-container') || document.createElement('div');
+      if (!blocksContainer.parentNode) {
+        blocksContainer.className = 'llamb-blocks-container';
+        contentDiv.insertBefore(blocksContainer, textContent);
+      }
+
+      blocksContainer.innerHTML = '';
+      data.blocks.forEach(block => {
+        const blockDiv = document.createElement('div');
+        blockDiv.className = `llamb-block llamb-${block.type}-block`;
+        
+        const emoji = {
+          'thinking': '🤔',
+          'reasoning': '🧠',
+          'reflection': '💭'
+        }[block.type] || '💡';
+
+        blockDiv.innerHTML = `
+          <div class="llamb-block-header">
+            <span class="llamb-block-emoji">${emoji}</span>
+            <strong>${block.type.charAt(0).toUpperCase() + block.type.slice(1)}</strong>
+          </div>
+          <div class="llamb-block-content">${escapeHtml(block.content).replace(/\n/g, '<br>')}</div>
+        `;
+        
+        blocksContainer.appendChild(blockDiv);
+      });
+    }
+
+    // Auto-scroll to bottom
+    const messagesContainer = document.getElementById('llamb-messages');
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  // Handle stream end
+  function handleStreamEnd(data) {
+    const assistantMessage = document.querySelector(`[data-request-id="${data.requestId}"]`);
+    if (!assistantMessage) return;
+
+    console.log('LlamB: Stream ended for request:', data.requestId);
+    
+    // Re-enable input
+    const chatInput = document.getElementById('llamb-chat-input');
+    const sendBtn = document.getElementById('llamb-send-btn');
+    chatInput.disabled = false;
+    sendBtn.disabled = false;
+    chatInput.focus();
+
+    // Remove streaming indicator if still present
+    const contentDiv = assistantMessage.querySelector('.llamb-message-content');
+    contentDiv.classList.remove('llamb-message-streaming');
+
+    // Final scroll to bottom
+    const messagesContainer = document.getElementById('llamb-messages');
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  // Handle stream errors
+  function handleStreamError(data) {
+    const assistantMessage = document.querySelector(`[data-request-id="${data.requestId}"]`);
+    if (!assistantMessage) return;
+
+    console.error('LlamB: Stream error:', data.error);
+    
+    const contentDiv = assistantMessage.querySelector('.llamb-message-content');
+    contentDiv.innerHTML = `
+      <div class="llamb-error-message">
+        ❌ Streaming Error: ${escapeHtml(data.error)}
+      </div>
+    `;
+
+    // Re-enable input
+    const chatInput = document.getElementById('llamb-chat-input');
+    const sendBtn = document.getElementById('llamb-send-btn');
+    chatInput.disabled = false;
+    sendBtn.disabled = false;
+    chatInput.focus();
+  }
+
+  // Escape HTML to prevent XSS
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   // Get selected text from page
@@ -255,6 +420,18 @@
         } else {
           sendResponse({ success: false, error: 'Sidebar not visible' });
         }
+      } else if (request.action === 'streamChunk') {
+        // Handle streaming response chunks
+        handleStreamChunk(request);
+        sendResponse({ success: true });
+      } else if (request.action === 'streamEnd') {
+        // Handle streaming response end
+        handleStreamEnd(request);
+        sendResponse({ success: true });
+      } else if (request.action === 'streamError') {
+        // Handle streaming errors
+        handleStreamError(request);
+        sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Unknown action' });
       }

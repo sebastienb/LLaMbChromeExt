@@ -359,3 +359,124 @@ body.llamb-sidebar-closed {
     transform: translateY(0);
   }
 }
+
+/* Streaming and typing indicator */
+.llamb-typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+.llamb-typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9aa0a6;
+  animation: typing 1.5s ease-in-out infinite;
+}
+
+.llamb-typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.llamb-typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Thinking/Reasoning blocks */
+.llamb-blocks-container {
+  margin-bottom: 16px;
+}
+
+.llamb-block {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e8eaed;
+  background: #f8f9fa;
+}
+
+.llamb-thinking-block {
+  border-left: 4px solid #fbbc04;
+}
+
+.llamb-reasoning-block {
+  border-left: 4px solid #4285f4;
+}
+
+.llamb-reflection-block {
+  border-left: 4px solid #34a853;
+}
+
+.llamb-block-header {
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.03);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #5f6368;
+}
+
+.llamb-block-emoji {
+  font-size: 14px;
+}
+
+.llamb-block-content {
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #202124;
+  background: white;
+}
+
+/* Error messages */
+.llamb-error-message {
+  color: #ea4335;
+  background: #fce8e6;
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid #ea4335;
+  font-size: 13px;
+}
+
+/* Dark mode support for new elements */
+@media (prefers-color-scheme: dark) {
+  .llamb-typing-indicator span {
+    background: #9aa0a6;
+  }
+  
+  .llamb-block {
+    background: #2d2d30;
+    border-color: #404040;
+  }
+  
+  .llamb-block-header {
+    background: rgba(255,255,255,0.05);
+    color: #9aa0a6;
+  }
+  
+  .llamb-block-content {
+    background: #2d2d30;
+    color: #e8eaed;
+  }
+  
+  .llamb-error-message {
+    background: rgba(234, 67, 53, 0.1);
+    color: #f28b82;
+    border-color: #f28b82;
+  }
+}
