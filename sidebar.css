@@ -263,8 +263,7 @@ body.llamb-sidebar-closed {
 }
 
 .llamb-sidebar-visible .llamb-sidebar-toggle {
-  right: 400px;
-  opacity: 0.7;
+  display: none !important;
 }
 
 .llamb-sidebar-toggle:hover {
