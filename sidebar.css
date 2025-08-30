@@ -129,22 +129,26 @@ body.llamb-sidebar-closed {
 .llamb-sidebar-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-weight: 500;
   font-size: 15px;
   color: var(--llamb-text-primary);
+  flex: 1;
+  min-width: 0;
 }
 
 .llamb-logo {
   width: 20px;
   height: 20px;
   border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .llamb-header-actions {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .llamb-theme-toggle, .llamb-sidebar-close {
@@ -595,8 +599,8 @@ body.llamb-sidebar-closed {
 .llamb-input-wrapper {
   padding: 16px 24px 24px 24px;
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
 }
 
 #llamb-chat-input {
@@ -616,6 +620,7 @@ body.llamb-sidebar-closed {
   line-height: 1.4;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
+  box-sizing: border-box;
 }
 
 /* Hide scrollbar for webkit browsers */
@@ -636,8 +641,8 @@ body.llamb-sidebar-closed {
   background: var(--llamb-user-bubble);
   border: none;
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   color: white;
   cursor: pointer;
   display: flex;
@@ -645,6 +650,7 @@ body.llamb-sidebar-closed {
   justify-content: center;
   transition: all 0.2s;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .llamb-send-btn:hover {

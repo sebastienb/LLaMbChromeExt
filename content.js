@@ -534,7 +534,7 @@
           <div class="llamb-input-wrapper">
             <textarea 
               id="llamb-chat-input" 
-              placeholder="Ask about this page or anything else..."
+              placeholder="Ask me anything..."
               rows="1"
             ></textarea>
             <button id="llamb-send-btn" class="llamb-send-btn">
