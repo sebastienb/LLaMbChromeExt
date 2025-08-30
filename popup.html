@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 320px;
+            padding: 0;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 16px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header .subtitle {
+            margin: 4px 0 0 0;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .quick-actions {
+            margin-bottom: 24px;
+        }
+
+        .quick-actions h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #202124;
+        }
+
+        .action-button {
+            width: 100%;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            background: white;
+            border: 1px solid #e8eaed;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .action-button:hover {
+            background: #f8f9fa;
+            border-color: #667eea;
+        }
+
+        .action-button.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+
+        .action-button.primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .settings-section {
+            border-top: 1px solid #e8eaed;
+            padding-top: 16px;
+        }
+
+        .settings-section h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #202124;
+        }
+
+        .setting-item {
+            margin-bottom: 12px;
+        }
+
+        .setting-item label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: #5f6368;
+            font-weight: 500;
+        }
+
+        .setting-item select, .setting-item input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #e8eaed;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .setting-item select:focus, .setting-item input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #e8f5e8;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #137333;
+            margin-top: 12px;
+        }
+
+        .status-indicator.disconnected {
+            background: #fce8e6;
+            color: #d93025;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #34a853;
+        }
+
+        .status-indicator.disconnected .status-dot {
+            background: #ea4335;
+        }
+
+        .footer {
+            padding: 12px 20px;
+            border-top: 1px solid #e8eaed;
+            background: #f8f9fa;
+            text-align: center;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            font-size: 12px;
+        }
+
+        .footer-links a {
+            color: #5f6368;
+            text-decoration: none;
+        }
+
+        .footer-links a:hover {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🦙 LlamB Assistant</h1>
+        <div class="subtitle">AI Chat with webpage context</div>
+    </div>
+
+    <div class="content">
+        <div class="quick-actions">
+            <h3>Quick Actions</h3>
+            <button class="action-button primary" id="toggle-sidebar">
+                💬 Toggle Chat Sidebar
+            </button>
+            <button class="action-button" id="analyze-page">
+                📄 Analyze Current Page
+            </button>
+            <button class="action-button" id="summarize-selection">
+                ✨ Summarize Selection
+            </button>
+        </div>
+
+        <div class="settings-section">
+            <h3>Settings</h3>
+            
+            <div class="setting-item">
+                <label for="model-select">AI Model</label>
+                <select id="model-select">
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                    <option value="claude-3-opus">Claude 3 Opus</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label for="api-key">API Key</label>
+                <input type="password" id="api-key" placeholder="Enter your API key...">
+            </div>
+
+            <div class="status-indicator" id="connection-status">
+                <div class="status-dot"></div>
+                <span>Ready to connect</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="footer-links">
+            <a href="#" id="help-link">Help</a>
+            <a href="#" id="settings-link">Advanced Settings</a>
+            <a href="#" id="feedback-link">Feedback</a>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

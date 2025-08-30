@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator</title>
+</head>
+<body>
+    <canvas id="canvas16" width="16" height="16" style="border: 1px solid black;"></canvas>
+    <canvas id="canvas48" width="48" height="48" style="border: 1px solid black;"></canvas>
+    <canvas id="canvas128" width="128" height="128" style="border: 1px solid black;"></canvas>
+
+    <script>
+        function createIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Create gradient background
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            
+            // Draw background circle
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(size/2, size/2, size/2 - 1, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw llama emoji or L letter
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${Math.floor(size * 0.6)}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            if (size >= 48) {
+                // Use llama emoji for larger sizes
+                ctx.font = `${Math.floor(size * 0.5)}px Arial`;
+                ctx.fillText('🦙', size/2, size/2);
+            } else {
+                // Use L for smaller sizes
+                ctx.fillText('L', size/2, size/2);
+            }
+        }
+
+        // Create icons
+        createIcon(document.getElementById('canvas16'), 16);
+        createIcon(document.getElementById('canvas48'), 48);
+        createIcon(document.getElementById('canvas128'), 128);
+
+        // Function to download canvas as PNG
+        function downloadCanvas(canvas, filename) {
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // Add download buttons
+        const button16 = document.createElement('button');
+        button16.textContent = 'Download 16x16';
+        button16.onclick = () => downloadCanvas(document.getElementById('canvas16'), 'icon16.png');
+        document.body.appendChild(button16);
+
+        const button48 = document.createElement('button');
+        button48.textContent = 'Download 48x48';
+        button48.onclick = () => downloadCanvas(document.getElementById('canvas48'), 'icon48.png');
+        document.body.appendChild(button48);
+
+        const button128 = document.createElement('button');
+        button128.textContent = 'Download 128x128';
+        button128.onclick = () => downloadCanvas(document.getElementById('canvas128'), 'icon128.png');
+        document.body.appendChild(button128);
+    </script>
+</body>
+</html>
