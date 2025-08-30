@@ -452,6 +452,52 @@ body.llamb-sidebar-closed {
   gap: 6px;
 }
 
+/* Suggested Actions */
+.llamb-suggested-actions {
+  padding: 16px 24px 8px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: llamb-fade-in 0.3s ease-in;
+}
+
+@keyframes llamb-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.llamb-action-btn {
+  background: var(--llamb-bg-tertiary);
+  border: 1px solid var(--llamb-border);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--llamb-text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+
+.llamb-action-btn:hover {
+  background: var(--llamb-user-bubble);
+  color: var(--llamb-user-text);
+  border-color: var(--llamb-user-bubble);
+  transform: translateY(-1px);
+}
+
+.llamb-action-btn:active {
+  transform: translateY(0);
+}
+
+.llamb-suggested-actions.hidden {
+  display: none;
+}
+
 /* Chat Input Container */
 .llamb-chat-input-container {
   background: var(--llamb-bg-primary);

@@ -398,6 +398,23 @@
     return html;
   }
 
+  // Update suggested action buttons based on context
+  function updateSuggestedActions() {
+    const explainButton = document.querySelector('[data-action="explain-selected"]');
+    if (explainButton) {
+      const hasSelection = preservedSelections.length > 0 || getSelectedText();
+      if (hasSelection) {
+        explainButton.textContent = '🔍 Explain selected text';
+        explainButton.disabled = false;
+        explainButton.style.opacity = '1';
+      } else {
+        explainButton.textContent = '🔍 Select text to explain';
+        explainButton.disabled = true;
+        explainButton.style.opacity = '0.6';
+      }
+    }
+  }
+
   // Update context chips display
   function updateContextChips() {
     const chipsContainer = document.getElementById('llamb-context-chips');
@@ -424,6 +441,9 @@
     if (clearAllBtn) {
       clearAllBtn.style.display = preservedSelections.length > 1 ? 'block' : 'none';
     }
+    
+    // Update suggested actions when context changes
+    updateSuggestedActions();
   }
 
   // Create selection chip element
@@ -487,6 +507,20 @@
                 Hello! I'm your AI assistant. I can see the current webpage and help you analyze it. How can I assist you today?
               </div>
             </div>
+          </div>
+          <div class="llamb-suggested-actions" id="llamb-suggested-actions">
+            <button class="llamb-action-btn" data-action="summarize">
+              📝 Summarize this page
+            </button>
+            <button class="llamb-action-btn" data-action="explain-selected">
+              🔍 Explain selected text
+            </button>
+            <button class="llamb-action-btn" data-action="what-about">
+              ❓ What is this page about?
+            </button>
+            <button class="llamb-action-btn" data-action="key-takeaways">
+              💡 Key takeaways
+            </button>
           </div>
         </div>
         <div class="llamb-chat-input-container">
@@ -618,6 +652,18 @@
       }
     });
 
+    // Set up suggested action buttons
+    const actionButtons = document.querySelectorAll('.llamb-action-btn');
+    actionButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        const action = e.target.getAttribute('data-action');
+        handleSuggestedAction(action);
+      });
+    });
+    
+    // Update suggested actions on initial load
+    updateSuggestedActions();
+
     // Auto-resize textarea
     chatInput.addEventListener('input', () => {
       chatInput.style.height = 'auto';
@@ -633,6 +679,48 @@
         clearAllSelections();
       });
     }
+  }
+
+  // Handle suggested action clicks
+  function handleSuggestedAction(action) {
+    const chatInput = document.getElementById('llamb-chat-input');
+    const suggestedActions = document.getElementById('llamb-suggested-actions');
+    
+    let message = '';
+    
+    switch (action) {
+      case 'summarize':
+        message = 'Please summarize the content of this webpage, highlighting the main points and key information.';
+        break;
+      case 'explain-selected':
+        const selectedText = preservedSelections.length > 0 
+          ? preservedSelections.map(sel => sel.text).join('\n\n---\n\n')
+          : getSelectedText();
+        
+        if (!selectedText) {
+          message = 'Please select some text on the page first, then I can explain it for you.';
+        } else {
+          message = 'Please explain the selected text in detail and provide context about its meaning.';
+        }
+        break;
+      case 'what-about':
+        message = 'What is this webpage about? Please provide an overview of the topic, purpose, and main content.';
+        break;
+      case 'key-takeaways':
+        message = 'What are the key takeaways from this webpage? Please extract the most important insights, conclusions, or actionable information.';
+        break;
+    }
+    
+    // Set the message in the input field
+    chatInput.value = message;
+    
+    // Hide suggested actions
+    if (suggestedActions) {
+      suggestedActions.classList.add('hidden');
+    }
+    
+    // Send the message automatically
+    sendMessage();
   }
 
   // Send message function
@@ -669,6 +757,12 @@
     // Clear input
     chatInput.value = '';
     chatInput.style.height = 'auto';
+
+    // Hide suggested actions after first user message
+    const suggestedActions = document.getElementById('llamb-suggested-actions');
+    if (suggestedActions && !suggestedActions.classList.contains('hidden')) {
+      suggestedActions.classList.add('hidden');
+    }
 
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -842,6 +936,28 @@
   // Get selected text from page
   function getSelectedText() {
     return window.getSelection().toString();
+  }
+
+  // Clear chat and show suggestions
+  function clearChat() {
+    const messagesContainer = document.getElementById('llamb-messages');
+    const suggestedActions = document.getElementById('llamb-suggested-actions');
+    
+    if (messagesContainer) {
+      // Keep only the initial AI message and suggested actions
+      const assistantMessages = messagesContainer.querySelectorAll('.llamb-message-container.llamb-assistant-container');
+      const initialMessage = assistantMessages[0]; // First assistant message
+      
+      messagesContainer.innerHTML = '';
+      if (initialMessage) {
+        messagesContainer.appendChild(initialMessage);
+      }
+    }
+    
+    // Show suggested actions again
+    if (suggestedActions) {
+      suggestedActions.classList.remove('hidden');
+    }
   }
 
   // Get page context
