@@ -29,6 +29,32 @@
     timestamp: null
   };
 
+  // Load plugin classes inline to avoid context isolation
+  async function loadPluginClassesInline() {
+    try {
+      // Fetch and execute plugin-base.js in content script context
+      const pluginBaseResponse = await fetch(chrome.runtime.getURL('js/plugin-base.js'));
+      const pluginBaseCode = await pluginBaseResponse.text();
+      
+      // Create a new function to execute the code in our context
+      const pluginBaseFunction = new Function(pluginBaseCode);
+      pluginBaseFunction.call(window);
+      console.log('LlamB: LlambPluginBase loaded inline:', typeof LlambPluginBase);
+      
+      // Fetch and execute plugin-manager.js in content script context
+      const pluginManagerResponse = await fetch(chrome.runtime.getURL('js/plugin-manager.js'));
+      const pluginManagerCode = await pluginManagerResponse.text();
+      
+      // Create a new function to execute the code in our context
+      const pluginManagerFunction = new Function(pluginManagerCode);
+      pluginManagerFunction.call(window);
+      console.log('LlamB: PluginManager loaded inline:', typeof PluginManager);
+      
+    } catch (error) {
+      console.error('LlamB: Error loading plugin classes inline:', error);
+    }
+  }
+
   // Load required scripts
   async function loadRequiredScripts() {
     try {
@@ -65,74 +91,15 @@
         });
       }
       
-      // Load PluginBase
-      if (typeof LlambPluginBase === 'undefined') {
-        console.log('LlamB: Loading PluginBase script...');
-        const pluginBaseScript = document.createElement('script');
-        pluginBaseScript.src = chrome.runtime.getURL('js/plugin-base.js');
-        document.head.appendChild(pluginBaseScript);
-        await new Promise((resolve, reject) => {
-          pluginBaseScript.onload = () => {
-            setTimeout(() => {
-              console.log('LlamB: LlambPluginBase type after load:', typeof LlambPluginBase);
-              resolve();
-            }, 50);
-          };
-          pluginBaseScript.onerror = reject;
-        });
-      }
-      
-      // Load PluginManager
-      if (typeof PluginManager === 'undefined') {
-        console.log('LlamB: Loading PluginManager script...');
-        const pluginScript = document.createElement('script');
-        pluginScript.src = chrome.runtime.getURL('js/plugin-manager.js');
-        document.head.appendChild(pluginScript);
-        await new Promise((resolve, reject) => {
-          pluginScript.onload = () => {
-            console.log('LlamB: PluginManager script loaded');
-            setTimeout(() => {
-              console.log('LlamB: PluginManager type after load:', typeof PluginManager);
-              console.log('LlamB: window.PluginManager available?', typeof window.PluginManager);
-              // Debug window object contents
-              console.log('LlamB: Checking window object for PluginManager...');
-              console.log('LlamB: window keys containing Plugin:', Object.keys(window).filter(k => k.includes('Plugin')));
-              console.log('LlamB: Direct window.PluginManager check:', window.PluginManager);
-              console.log('LlamB: window["PluginManager"] check:', window["PluginManager"]);
-              
-              // Try to access with different methods
-              console.log('LlamB: _llambPluginManagerLoaded?', window._llambPluginManagerLoaded);
-              console.log('LlamB: _llambPluginManagerClass?', typeof window._llambPluginManagerClass);
-              
-              if (window.PluginManager) {
-                console.log('LlamB: Found PluginManager on window object');
-              } else if (window._llambPluginManagerClass) {
-                console.log('LlamB: Found PluginManager via _llambPluginManagerClass');
-                window.PluginManager = window._llambPluginManagerClass;
-              } else {
-                console.error('LlamB: PluginManager NOT found on window object despite assignment message');
-              }
-              resolve();
-            }, 100);
-          };
-          pluginScript.onerror = (error) => {
-            console.error('LlamB: Failed to load PluginManager script:', error);
-            reject(error);
-          };
-        });
-      }
+      // Load plugin classes inline to avoid context isolation issues
+      console.log('LlamB: Loading plugin classes inline...');
+      await loadPluginClassesInline();
       
       console.log('LlamB: Required scripts loaded');
       console.log('LlamB: StorageManager available:', typeof StorageManager);
       console.log('LlamB: ChatManager available:', typeof ChatManager);
       console.log('LlamB: PluginManager available:', typeof PluginManager);
       console.log('LlamB: LlambPluginBase available:', typeof LlambPluginBase);
-      
-      // List all available classes on window
-      const classes = Object.keys(window).filter(key => 
-        key.endsWith('Manager') || key.includes('Plugin') || key.includes('Chat')
-      );
-      console.log('LlamB: All Manager/Plugin classes on window:', classes);
     } catch (error) {
       console.error('LlamB: Error loading scripts:', error);
     }
@@ -173,9 +140,9 @@
       }
       
       // Initialize PluginManager
-      if (typeof window.PluginManager === 'function') {
+      if (typeof PluginManager === 'function') {
         try {
-          pluginManager = new window.PluginManager();
+          pluginManager = new PluginManager();
           await pluginManager.initialize();
           console.log('LlamB: PluginManager initialized successfully');
           
@@ -193,7 +160,8 @@
         }
       } else {
         console.warn('LlamB: PluginManager class not available');
-        console.log('LlamB: window.PluginManager type:', typeof window.PluginManager);
+        console.log('LlamB: typeof PluginManager:', typeof PluginManager);
+        console.log('LlamB: typeof window.PluginManager:', typeof window.PluginManager);
       }
       
       if (typeof StorageManager !== 'undefined') {
