@@ -85,50 +85,28 @@
       // Load PluginManager
       if (typeof PluginManager === 'undefined') {
         console.log('LlamB: Loading PluginManager script...');
-        const pluginManagerUrl = chrome.runtime.getURL('js/plugin-manager.js');
-        console.log('LlamB: PluginManager script URL:', pluginManagerUrl);
-        
-        try {
-          // Try fetch method first
-          const response = await fetch(pluginManagerUrl);
-          const scriptContent = await response.text();
-          console.log('LlamB: PluginManager script fetched, length:', scriptContent.length);
-          
-          // Execute the script content directly
-          eval(scriptContent);
-          console.log('LlamB: PluginManager script executed via eval');
-          
-          // Check if it worked
-          setTimeout(() => {
-            console.log('LlamB: PluginManager type after eval:', typeof PluginManager);
-            console.log('LlamB: window.PluginManager available?', typeof window.PluginManager);
-          }, 50);
-          
-        } catch (fetchError) {
-          console.error('LlamB: Fetch method failed, trying script tag:', fetchError);
-          
-          // Fallback to script tag method
-          const pluginScript = document.createElement('script');
-          pluginScript.src = pluginManagerUrl;
-          document.head.appendChild(pluginScript);
-          await new Promise((resolve, reject) => {
-            pluginScript.onload = () => {
-              console.log('LlamB: PluginManager script loaded via script tag');
-              setTimeout(() => {
-                console.log('LlamB: PluginManager type after script tag load:', typeof PluginManager);
-                console.log('LlamB: window.PluginManager available?', typeof window.PluginManager);
-                if (typeof window.PluginManager === 'undefined') {
-                  console.error('LlamB: PluginManager still not found on window object');
-                }
-                resolve();
-              }, 100);
-            };
-            pluginScript.onerror = (error) => {
-              console.error('LlamB: Failed to load PluginManager script:', error);
-              reject(error);
-            };
-          });
-        }
+        const pluginScript = document.createElement('script');
+        pluginScript.src = chrome.runtime.getURL('js/plugin-manager.js');
+        document.head.appendChild(pluginScript);
+        await new Promise((resolve, reject) => {
+          pluginScript.onload = () => {
+            console.log('LlamB: PluginManager script loaded');
+            setTimeout(() => {
+              console.log('LlamB: PluginManager type after load:', typeof PluginManager);
+              console.log('LlamB: window.PluginManager available?', typeof window.PluginManager);
+              // Try to assign from window if it exists there
+              if (typeof PluginManager === 'undefined' && typeof window.PluginManager === 'function') {
+                window.PluginManager = window.PluginManager;
+                console.log('LlamB: Assigned PluginManager from window.PluginManager');
+              }
+              resolve();
+            }, 100);
+          };
+          pluginScript.onerror = (error) => {
+            console.error('LlamB: Failed to load PluginManager script:', error);
+            reject(error);
+          };
+        });
       }
       
       console.log('LlamB: Required scripts loaded');
@@ -168,9 +146,9 @@
       }
       
       // Initialize managers with error handling
-      if (typeof ChatManager !== 'undefined') {
+      if (typeof window.ChatManager === 'function') {
         try {
-          chatManager = new ChatManager();
+          chatManager = new window.ChatManager();
           console.log('LlamB: ChatManager initialized successfully');
         } catch (error) {
           console.error('LlamB: Error creating ChatManager:', error);
@@ -178,12 +156,13 @@
         }
       } else {
         console.warn('LlamB: ChatManager class not available');
+        console.log('LlamB: window.ChatManager type:', typeof window.ChatManager);
       }
       
       // Initialize PluginManager
-      if (typeof PluginManager !== 'undefined') {
+      if (typeof window.PluginManager === 'function') {
         try {
-          pluginManager = new PluginManager();
+          pluginManager = new window.PluginManager();
           await pluginManager.initialize();
           console.log('LlamB: PluginManager initialized successfully');
           
@@ -201,6 +180,7 @@
         }
       } else {
         console.warn('LlamB: PluginManager class not available');
+        console.log('LlamB: window.PluginManager type:', typeof window.PluginManager);
       }
       
       if (typeof StorageManager !== 'undefined') {
