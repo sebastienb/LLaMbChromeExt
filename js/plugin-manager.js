@@ -124,41 +124,31 @@ class PluginManager {
     }
 
     try {
-      // Load plugin script
-      const script = document.createElement('script');
-      script.src = chrome.runtime.getURL(manifest.scriptPath);
+      // Since we can't use eval due to CSP, we need to check if the plugin class
+      // is already available in the global scope (loaded via manifest.json)
+      const className = this.getPluginClassName(pluginId);
       
-      await new Promise((resolve, reject) => {
-        script.onload = () => {
-          // Plugin class should be globally available with name pattern: PluginClassName
-          const className = this.getPluginClassName(pluginId);
-          const PluginClass = window[className];
-          
-          if (!PluginClass) {
-            reject(new Error(`Plugin class ${className} not found`));
-            return;
-          }
-
-          try {
-            // Create plugin instance with controlled API access
-            const pluginApi = this.createPluginApi(pluginId);
-            const plugin = new PluginClass(pluginApi, manifest);
-            
-            // Initialize plugin
-            plugin.onInit();
-            
-            this.plugins.set(pluginId, plugin);
-            console.log(`PluginManager: Loaded plugin ${pluginId}`);
-            resolve();
-          } catch (error) {
-            reject(error);
-          }
-        };
+      // Check if plugin class is already loaded
+      let PluginClass = window[className];
+      
+      if (!PluginClass) {
+        console.log(`PluginManager: Plugin class ${className} not found, attempting to load...`);
         
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
+        // For now, we need to pre-load plugins in manifest.json
+        // This is a limitation of Manifest V3 CSP restrictions
+        console.warn(`PluginManager: Plugin ${pluginId} must be added to manifest.json to load properly`);
+        return false;
+      }
 
+      // Create plugin instance with controlled API access
+      const pluginApi = this.createPluginApi(pluginId);
+      const plugin = new PluginClass(pluginApi, manifest);
+      
+      // Initialize plugin
+      plugin.onInit();
+      
+      this.plugins.set(pluginId, plugin);
+      console.log(`PluginManager: Loaded plugin ${pluginId}`);
       return true;
     } catch (error) {
       console.error(`PluginManager: Failed to load plugin ${pluginId}:`, error);

@@ -1114,11 +1114,19 @@
     const chip = document.createElement('div');
     chip.className = 'llamb-chip llamb-chip-plugin';
     chip.dataset.pluginId = chipData.pluginId;
+    let statusIcon = '';
+    if (chipData.status === 'loading') {
+      statusIcon = '<span class="llamb-chip-status">⏳</span>';
+    } else if (chipData.status === 'unavailable') {
+      statusIcon = '<span class="llamb-chip-status">⚠️</span>';
+    } else if (chipData.status === 'ready') {
+      statusIcon = '<span class="llamb-chip-status">✓</span>';
+    }
+    
     chip.innerHTML = `
       <span class="llamb-chip-icon">${chipData.icon}</span>
       <span class="llamb-chip-text">${chipData.text}</span>
-      ${chipData.status === 'loading' ? '<span class="llamb-chip-status">⏳</span>' : ''}
-      ${chipData.status === 'ready' ? '<span class="llamb-chip-status">✓</span>' : ''}
+      ${statusIcon}
     `;
     
     // Add click handler to toggle chip
@@ -1333,7 +1341,10 @@
       console.log('LlamB: Added llamb-sidebar-open to body');
       
       // Update context chips when showing sidebar
-      setTimeout(() => updateContextChips(), 100);
+      setTimeout(() => {
+        updateContextChips();
+        updatePluginChips();
+      }, 100);
     } else {
       document.body.classList.remove('llamb-sidebar-open');
       document.body.classList.add('llamb-sidebar-closed');
@@ -1956,7 +1967,7 @@
 
   // Clear content cache when URL changes
   let lastUrl = window.location.href;
-  new MutationObserver(() => {
+  new MutationObserver(async () => {
     const currentUrl = window.location.href;
     if (currentUrl !== lastUrl) {
       lastUrl = currentUrl;
@@ -1965,6 +1976,13 @@
         content: null,
         timestamp: null
       };
+      
+      // Notify plugins of page change
+      if (pluginManager) {
+        console.log('LlamB: URL changed, notifying plugins...');
+        await pluginManager.onPageChange();
+        updatePluginChips();
+      }
     }
   }).observe(document, { subtree: true, childList: true });
 
@@ -1978,6 +1996,10 @@
       sidebar = createSidebar();
       setupEventListeners();
       detectAndApplyTheme();
+      // Update plugin chips after sidebar is created
+      if (pluginManager) {
+        updatePluginChips();
+      }
     }
   }
 

@@ -1,4 +1,7 @@
 // YouTube Captions Plugin - Extract captions from YouTube videos
+console.log('YoutubeCaptionsPlugin: Loading plugin script');
+console.log('YoutubeCaptionsPlugin: LlambPluginBase available?', typeof LlambPluginBase !== 'undefined');
+
 class YoutubeCaptionsPlugin extends LlambPluginBase {
   constructor(api, manifest) {
     super(api, manifest);
@@ -13,11 +16,14 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
    * Check if this plugin should run on the current page
    */
   shouldRunOnCurrentPage() {
-    const isYouTube = this.isOnDomain(['youtube.com', 'www.youtube.com']) || 
-                     window.location.hostname.includes('youtube.com');
+    const hostname = window.location.hostname;
+    const isYouTube = hostname === 'youtube.com' || 
+                     hostname === 'www.youtube.com' || 
+                     hostname === 'm.youtube.com' ||
+                     hostname.endsWith('.youtube.com');
     const isVideo = this.isVideoPage();
     
-    this.log('Domain check:', window.location.hostname, 'isYouTube:', isYouTube, 'isVideo:', isVideo);
+    this.log('Domain check:', hostname, 'isYouTube:', isYouTube, 'isVideo:', isVideo);
     return isYouTube && isVideo;
   }
 
@@ -45,12 +51,38 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
       return null;
     }
 
+    let status = 'loading';
+    let description = 'Extracting captions from this YouTube video...';
+    
+    if (this.captionsCache) {
+      status = 'ready';
+      description = 'Video captions available';
+    } else if (this.captionsCache === false) {
+      status = 'unavailable';
+      description = 'No captions available for this video';
+    }
+
     return {
       icon: this.speechBubbleIcon,
       text: 'Video Captions',
-      description: 'Extract captions from this YouTube video',
-      status: this.captionsCache ? 'ready' : 'loading'
+      description: description,
+      status: status
     };
+  }
+  
+  /**
+   * Update the context chip with current status
+   */
+  updateContextChip() {
+    const chipData = this.getContextChipData();
+    if (chipData) {
+      this.addContextChip(chipData);
+      
+      // Also trigger a UI update if the function exists
+      if (typeof window.updatePluginChips === 'function') {
+        window.updatePluginChips();
+      }
+    }
   }
 
   /**
@@ -113,17 +145,26 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
 
       if (captions) {
         const videoTitle = this.getVideoTitle();
-        this.captionsCache = this.formatContentForChat(captions, {
-          title: `YouTube Video Captions: ${videoTitle}`,
+        // Format captions with clear labeling
+        const formattedCaptions = `## YouTube Video Captions\n\n**Video Title:** ${videoTitle}\n**Video ID:** ${videoId}\n\n${captions}`;
+        
+        this.captionsCache = this.formatContentForChat(formattedCaptions, {
+          title: `YouTube Video Captions`,
           type: 'captions',
-          includeMetadata: true
+          includeMetadata: false // We're adding our own metadata
         });
         
         this.log('Successfully extracted captions');
         this.emit('captions-extracted', { videoId, captions });
+        
+        // Update the context chip to show ready status
+        this.updateContextChip();
       } else {
         this.warn('No captions found for this video');
-        this.captionsCache = null;
+        this.captionsCache = false; // Set to false to indicate we checked but found no captions
+        
+        // Update chip to show no captions available
+        this.updateContextChip();
       }
 
       return this.captionsCache;
@@ -277,8 +318,10 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
 
       if (transcript) {
         const captionInfo = this.getCaptionTrackInfo(track);
-        let formattedTranscript = `**Caption Language:** ${captionInfo.language}\n`;
-        formattedTranscript += `**Caption Type:** ${captionInfo.type}\n\n`;
+        let formattedTranscript = `### Caption Details\n`;
+        formattedTranscript += `- **Language:** ${captionInfo.language}\n`;
+        formattedTranscript += `- **Type:** ${captionInfo.type}\n\n`;
+        formattedTranscript += `### Transcript\n\n`;
         formattedTranscript += transcript;
         
         return formattedTranscript;
@@ -413,3 +456,4 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
 
 // Make plugin available globally
 window.YoutubeCaptionsPlugin = YoutubeCaptionsPlugin;
+console.log('YoutubeCaptionsPlugin: Class registered globally');

@@ -220,14 +220,19 @@ class LLMManager {
     }
     
     if (pageContext.selectedText) {
-      contextText += `Selected text: "${pageContext.selectedText}"\n`;
+      contextText += `\nSelected text from page:\n"${pageContext.selectedText}"\n`;
     }
     
-    // Use markdown content if available, otherwise fall back to visibleText
+    // Add plugin content separately if available (e.g., YouTube captions)
+    if (pageContext.pluginContent) {
+      contextText += `\n## Additional extracted content:\n${pageContext.pluginContent}\n`;
+    }
+    
+    // Add page content separately with clear labeling
     if (pageContext.markdownContent) {
-      contextText += `\nPage content in markdown format:\n\`\`\`markdown\n${pageContext.markdownContent}\n\`\`\`\n`;
+      contextText += `\n## Page HTML content (in markdown format):\n\`\`\`markdown\n${pageContext.markdownContent}\n\`\`\`\n`;
     } else if (pageContext.visibleText) {
-      contextText += `Visible content: ${pageContext.visibleText.substring(0, 2000)}${pageContext.visibleText.length > 2000 ? '...' : ''}\n`;
+      contextText += `\n## Visible page text:\n${pageContext.visibleText.substring(0, 2000)}${pageContext.visibleText.length > 2000 ? '...' : ''}\n`;
     }
     
     contextText += '\nPlease consider this context when responding to the user\'s question.';
