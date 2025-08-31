@@ -2,10 +2,13 @@
 class StorageManager {
   constructor() {
     this.storageKey = 'llamb-settings';
+    this.sidebarStateKey = 'llamb-sidebar-state';
+    this.activeChatKey = 'llamb-active-chat';
     this.defaultSettings = {
       connections: [],
       activeConnectionId: null,
       fallbackEnabled: true,
+      quickActions: this.getDefaultQuickActions(),
       globalSettings: {
         theme: 'auto',
         autoContextCapture: true,
@@ -15,6 +18,48 @@ class StorageManager {
         temperature: 0.7
       }
     };
+  }
+
+  // Get default quick actions
+  getDefaultQuickActions() {
+    return [
+      {
+        id: 'summarize',
+        label: 'Summarize this page',
+        icon: '📝',
+        prompt: 'Please summarize this webpage:\nTitle: {pageTitle}\nURL: {pageUrl}\n\nContent:\n{pageContent}\n\nProvide a concise summary of the main points.',
+        usePageContext: true,
+        isDefault: true,
+        order: 1
+      },
+      {
+        id: 'explain-selected',
+        label: 'Explain selected text',
+        icon: '🔍',
+        prompt: 'Please explain this selected text from {pageTitle}:\n\n"{selectedText}"\n\nProvide a clear explanation of what this means.',
+        usePageContext: true,
+        isDefault: true,
+        order: 2
+      },
+      {
+        id: 'what-about',
+        label: 'What is this page about?',
+        icon: '❓',
+        prompt: 'What is this webpage about?\nTitle: {pageTitle}\nURL: {pageUrl}\n\nContent:\n{pageContent}\n\nProvide a brief overview of the main topic and purpose.',
+        usePageContext: true,
+        isDefault: true,
+        order: 3
+      },
+      {
+        id: 'key-takeaways',
+        label: 'Key takeaways',
+        icon: '💡',
+        prompt: 'What are the key takeaways from this page?\nTitle: {pageTitle}\n\nContent:\n{pageContent}\n\nList the most important points and insights.',
+        usePageContext: true,
+        isDefault: true,
+        order: 4
+      }
+    ];
   }
 
   // Get all settings
@@ -241,6 +286,116 @@ class StorageManager {
     return JSON.stringify(exportSettings, null, 2);
   }
 
+  // Get quick actions sorted by order
+  async getQuickActions() {
+    const settings = await this.getSettings();
+    return settings.quickActions ? 
+      settings.quickActions.sort((a, b) => (a.order || 0) - (b.order || 0)) :
+      this.getDefaultQuickActions();
+  }
+
+  // Save quick actions
+  async saveQuickActions(quickActions) {
+    const settings = await this.getSettings();
+    settings.quickActions = quickActions.map((action, index) => ({
+      ...action,
+      order: action.order || (index + 1)
+    }));
+    await this.saveSettings(settings);
+    return settings.quickActions;
+  }
+
+  // Add new quick action
+  async addQuickAction(actionData) {
+    const settings = await this.getSettings();
+    const quickActions = settings.quickActions || this.getDefaultQuickActions();
+    
+    const newAction = {
+      id: this.generateUUID(),
+      label: actionData.label || 'New Action',
+      icon: actionData.icon || '⚡',
+      prompt: actionData.prompt || 'Please help me with: {pageTitle}',
+      usePageContext: actionData.usePageContext !== false,
+      isDefault: false,
+      order: Math.max(...quickActions.map(a => a.order || 0), 0) + 1,
+      createdAt: new Date().toISOString()
+    };
+
+    quickActions.push(newAction);
+    settings.quickActions = quickActions;
+    await this.saveSettings(settings);
+    return newAction;
+  }
+
+  // Update existing quick action
+  async updateQuickAction(actionId, updates) {
+    const settings = await this.getSettings();
+    const quickActions = settings.quickActions || this.getDefaultQuickActions();
+    const actionIndex = quickActions.findIndex(action => action.id === actionId);
+    
+    if (actionIndex === -1) {
+      throw new Error('Quick action not found');
+    }
+
+    quickActions[actionIndex] = {
+      ...quickActions[actionIndex],
+      ...updates,
+      id: actionId, // Ensure ID doesn't change
+      updatedAt: new Date().toISOString()
+    };
+
+    settings.quickActions = quickActions;
+    await this.saveSettings(settings);
+    return quickActions[actionIndex];
+  }
+
+  // Delete quick action
+  async deleteQuickAction(actionId) {
+    const settings = await this.getSettings();
+    const quickActions = settings.quickActions || this.getDefaultQuickActions();
+    const actionIndex = quickActions.findIndex(action => action.id === actionId);
+    
+    if (actionIndex === -1) {
+      throw new Error('Quick action not found');
+    }
+
+    quickActions.splice(actionIndex, 1);
+    settings.quickActions = quickActions;
+    await this.saveSettings(settings);
+    return true;
+  }
+
+  // Reset quick actions to defaults
+  async resetQuickActionsToDefault() {
+    const settings = await this.getSettings();
+    settings.quickActions = this.getDefaultQuickActions();
+    await this.saveSettings(settings);
+    return settings.quickActions;
+  }
+
+  // Reorder quick actions
+  async reorderQuickActions(actionIds) {
+    const settings = await this.getSettings();
+    const quickActions = settings.quickActions || this.getDefaultQuickActions();
+    
+    // Create new order based on provided IDs
+    const reorderedActions = actionIds.map((id, index) => {
+      const action = quickActions.find(a => a.id === id);
+      return action ? { ...action, order: index + 1 } : null;
+    }).filter(Boolean);
+
+    // Add any actions not in the reorder list at the end
+    quickActions.forEach(action => {
+      if (!actionIds.includes(action.id)) {
+        reorderedActions.push({ ...action, order: reorderedActions.length + 1 });
+      }
+    });
+
+    settings.quickActions = reorderedActions;
+    await this.saveSettings(settings);
+    return reorderedActions;
+  }
+
   // Generate UUID v4
   generateUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -254,6 +409,100 @@ class StorageManager {
   async resetSettings() {
     await chrome.storage.local.remove(this.storageKey);
     return this.defaultSettings;
+  }
+
+  // Sidebar state management
+  async getSidebarState(tabId) {
+    try {
+      const result = await chrome.storage.session.get(`${this.sidebarStateKey}-${tabId}`);
+      return result[`${this.sidebarStateKey}-${tabId}`] || { isVisible: false, chatId: null };
+    } catch (error) {
+      console.error('StorageManager: Error getting sidebar state:', error);
+      return { isVisible: false, chatId: null };
+    }
+  }
+
+  async setSidebarState(tabId, isVisible, chatId = null) {
+    try {
+      await chrome.storage.session.set({
+        [`${this.sidebarStateKey}-${tabId}`]: {
+          isVisible: isVisible,
+          chatId: chatId,
+          timestamp: Date.now()
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error('StorageManager: Error setting sidebar state:', error);
+      return false;
+    }
+  }
+
+  // Active chat management
+  async getActiveChat() {
+    try {
+      const result = await chrome.storage.session.get(this.activeChatKey);
+      return result[this.activeChatKey] || null;
+    } catch (error) {
+      console.error('StorageManager: Error getting active chat:', error);
+      return null;
+    }
+  }
+
+  async setActiveChat(chatId) {
+    try {
+      await chrome.storage.session.set({
+        [this.activeChatKey]: {
+          chatId: chatId,
+          timestamp: Date.now()
+        }
+      });
+      return true;
+    } catch (error) {
+      console.error('StorageManager: Error setting active chat:', error);
+      return false;
+    }
+  }
+
+  async clearActiveChat() {
+    try {
+      await chrome.storage.session.remove(this.activeChatKey);
+      return true;
+    } catch (error) {
+      console.error('StorageManager: Error clearing active chat:', error);
+      return false;
+    }
+  }
+
+  // Chat session cleanup
+  async cleanupOldSessions() {
+    try {
+      // Get all session storage keys
+      const allSession = await chrome.storage.session.get();
+      const now = Date.now();
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      
+      const keysToRemove = [];
+      
+      Object.keys(allSession).forEach(key => {
+        if (key.startsWith(this.sidebarStateKey) || key === this.activeChatKey) {
+          const data = allSession[key];
+          if (data && data.timestamp && (now - data.timestamp) > maxAge) {
+            keysToRemove.push(key);
+          }
+        }
+      });
+
+      if (keysToRemove.length > 0) {
+        await chrome.storage.session.remove(keysToRemove);
+        console.log('StorageManager: Cleaned up old sessions:', keysToRemove.length);
+      }
+      
+      return keysToRemove.length;
+    } catch (error) {
+      console.error('StorageManager: Error cleaning up sessions:', error);
+      return 0;
+    }
   }
 }
 

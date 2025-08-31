@@ -1,0 +1,775 @@
+/* LlamB Extension - Unified Design System */
+
+/* ============================================================================
+   CSS Custom Properties - Design Tokens
+   ============================================================================ */
+
+:root {
+  /* Colors - Light Mode */
+  --llamb-bg-primary: #ffffff;
+  --llamb-bg-secondary: #ffffff;
+  --llamb-bg-tertiary: #f9f9f9;
+  --llamb-text-primary: #0d0d0d;
+  --llamb-text-secondary: #8e8ea0;
+  --llamb-text-tertiary: #c4c4c4;
+  --llamb-border: #f0f0f0;
+  --llamb-border-light: transparent;
+  --llamb-user-bubble: #2a2a2a;
+  --llamb-user-text: #ffffff;
+  --llamb-assistant-bubble: #f6f6f6;
+  --llamb-assistant-text: #0d0d0d;
+  --llamb-chip-bg: #f0f0f0;
+  --llamb-chip-text: #8e8ea0;
+  --llamb-selection-bg: #e3f2fd;
+  --llamb-selection-text: #1976d2;
+  
+  /* Spacing */
+  --llamb-spacing-xs: 4px;
+  --llamb-spacing-sm: 8px;
+  --llamb-spacing-md: 12px;
+  --llamb-spacing-lg: 16px;
+  --llamb-spacing-xl: 20px;
+  --llamb-spacing-2xl: 24px;
+  
+  /* Border Radius */
+  --llamb-radius-sm: 4px;
+  --llamb-radius-md: 6px;
+  --llamb-radius-lg: 8px;
+  --llamb-radius-xl: 12px;
+  --llamb-radius-2xl: 16px;
+  --llamb-radius-3xl: 20px;
+  --llamb-radius-full: 50%;
+  
+  /* Typography */
+  --llamb-font-size-xs: 11px;
+  --llamb-font-size-sm: 12px;
+  --llamb-font-size-base: 13px;
+  --llamb-font-size-md: 14px;
+  --llamb-font-size-lg: 15px;
+  --llamb-font-size-xl: 16px;
+  --llamb-font-size-2xl: 18px;
+  
+  --llamb-font-weight-normal: 400;
+  --llamb-font-weight-medium: 500;
+  --llamb-font-weight-semibold: 600;
+  
+  /* Transitions */
+  --llamb-transition-fast: 0.15s ease;
+  --llamb-transition-normal: 0.2s ease;
+  --llamb-transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dark Mode */
+[data-llamb-theme="dark"] {
+  --llamb-bg-primary: #1a1a1a;
+  --llamb-bg-secondary: #1a1a1a;
+  --llamb-bg-tertiary: #2a2a2a;
+  --llamb-text-primary: #ffffff;
+  --llamb-text-secondary: #8e8ea0;
+  --llamb-text-tertiary: #666666;
+  --llamb-border: #2a2a2a;
+  --llamb-user-bubble: #2a2a2a;
+  --llamb-user-text: #ffffff;
+  --llamb-assistant-bubble: #2a2a2a;
+  --llamb-assistant-text: #ffffff;
+  --llamb-chip-bg: #2a2a2a;
+  --llamb-chip-text: #8e8ea0;
+  --llamb-selection-bg: #404040;
+  --llamb-selection-text: #ffffff;
+}
+
+/* ============================================================================
+   Base Styles
+   ============================================================================ */
+
+.llamb-root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--llamb-font-size-md);
+  line-height: 1.5;
+  color: var(--llamb-text-primary);
+  background: var(--llamb-bg-primary);
+}
+
+/* ============================================================================
+   Layout Components
+   ============================================================================ */
+
+/* Headers */
+.llamb-header {
+  padding: var(--llamb-spacing-2xl) var(--llamb-spacing-2xl) var(--llamb-spacing-lg) var(--llamb-spacing-2xl);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--llamb-bg-primary);
+  border-bottom: 1px solid var(--llamb-border);
+}
+
+.llamb-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--llamb-font-size-lg);
+  font-weight: var(--llamb-font-weight-medium);
+  color: var(--llamb-text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.llamb-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--llamb-spacing-xs);
+  flex-shrink: 0;
+}
+
+/* Sections */
+.llamb-section {
+  padding: var(--llamb-spacing-xl) var(--llamb-spacing-2xl);
+  border-bottom: 1px solid var(--llamb-border);
+}
+
+.llamb-section:last-child {
+  border-bottom: none;
+}
+
+.llamb-section-title {
+  font-size: var(--llamb-font-size-lg);
+  font-weight: var(--llamb-font-weight-medium);
+  color: var(--llamb-text-primary);
+  margin-bottom: var(--llamb-spacing-lg);
+}
+
+/* Cards */
+.llamb-card {
+  background: var(--llamb-bg-secondary);
+  border: 1px solid var(--llamb-border);
+  border-radius: var(--llamb-radius-lg);
+  padding: var(--llamb-spacing-lg);
+}
+
+.llamb-card + .llamb-card {
+  margin-top: var(--llamb-spacing-lg);
+}
+
+/* ============================================================================
+   Form Components
+   ============================================================================ */
+
+/* Form Groups */
+.llamb-form-group {
+  margin-bottom: var(--llamb-spacing-lg);
+}
+
+.llamb-form-group-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--llamb-spacing-lg);
+}
+
+/* Labels */
+.llamb-label {
+  display: block;
+  font-size: var(--llamb-font-size-base);
+  font-weight: var(--llamb-font-weight-medium);
+  color: var(--llamb-text-primary);
+  margin-bottom: var(--llamb-spacing-sm);
+}
+
+.llamb-label-secondary {
+  color: var(--llamb-text-secondary);
+  font-weight: var(--llamb-font-weight-normal);
+}
+
+/* Input Fields */
+.llamb-input {
+  width: 100%;
+  background: var(--llamb-bg-tertiary);
+  border: 1px solid var(--llamb-border);
+  border-radius: var(--llamb-radius-lg);
+  padding: var(--llamb-spacing-md) var(--llamb-spacing-lg);
+  font-size: var(--llamb-font-size-md);
+  color: var(--llamb-text-primary);
+  font-family: inherit;
+  outline: none;
+  transition: all var(--llamb-transition-normal);
+  box-sizing: border-box;
+}
+
+.llamb-input:focus {
+  border-color: var(--llamb-user-bubble);
+}
+
+.llamb-input::placeholder {
+  color: var(--llamb-text-tertiary);
+}
+
+.llamb-textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.4;
+}
+
+/* Select Fields */
+.llamb-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%238e8ea0' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 8px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 32px;
+}
+
+/* ============================================================================
+   Button Components
+   ============================================================================ */
+
+/* Base Button */
+.llamb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--llamb-spacing-sm);
+  padding: var(--llamb-spacing-sm) var(--llamb-spacing-lg);
+  background: var(--llamb-bg-tertiary);
+  border: 1px solid var(--llamb-border);
+  border-radius: var(--llamb-radius-md);
+  font-size: var(--llamb-font-size-base);
+  font-weight: var(--llamb-font-weight-medium);
+  color: var(--llamb-text-primary);
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--llamb-transition-fast);
+  box-sizing: border-box;
+}
+
+.llamb-btn:hover {
+  background: var(--llamb-user-bubble);
+  color: var(--llamb-user-text);
+  border-color: var(--llamb-user-bubble);
+  transform: translateY(-1px);
+}
+
+.llamb-btn:active {
+  transform: translateY(0);
+}
+
+.llamb-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Button Variants */
+.llamb-btn-primary {
+  background: var(--llamb-user-bubble);
+  color: var(--llamb-user-text);
+  border-color: var(--llamb-user-bubble);
+}
+
+.llamb-btn-primary:hover {
+  background: var(--llamb-text-primary);
+  border-color: var(--llamb-text-primary);
+}
+
+.llamb-btn-secondary {
+  background: transparent;
+  color: var(--llamb-text-secondary);
+  border-color: var(--llamb-border);
+}
+
+.llamb-btn-ghost {
+  background: transparent;
+  border: none;
+  color: var(--llamb-text-secondary);
+}
+
+/* Button Sizes */
+.llamb-btn-sm {
+  padding: var(--llamb-spacing-xs) var(--llamb-spacing-md);
+  font-size: var(--llamb-font-size-sm);
+}
+
+.llamb-btn-lg {
+  padding: var(--llamb-spacing-lg) var(--llamb-spacing-2xl);
+  font-size: var(--llamb-font-size-lg);
+}
+
+/* Icon Buttons */
+.llamb-btn-icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--llamb-radius-md);
+}
+
+.llamb-btn-icon-sm {
+  width: 24px;
+  height: 24px;
+}
+
+.llamb-btn-icon-lg {
+  width: 32px;
+  height: 32px;
+}
+
+.llamb-btn-circle {
+  border-radius: var(--llamb-radius-full);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+/* ============================================================================
+   Component Patterns
+   ============================================================================ */
+
+/* Chips */
+.llamb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--llamb-spacing-sm);
+  padding: var(--llamb-spacing-sm) var(--llamb-spacing-md);
+  background: var(--llamb-chip-bg);
+  border-radius: var(--llamb-radius-xl);
+  font-size: var(--llamb-font-size-sm);
+  font-weight: var(--llamb-font-weight-normal);
+  color: var(--llamb-chip-text);
+  border: none;
+  max-width: 200px;
+  min-height: 32px;
+}
+
+.llamb-chip-selection {
+  background: var(--llamb-selection-bg);
+  color: var(--llamb-selection-text);
+}
+
+.llamb-chip-close {
+  margin-left: var(--llamb-spacing-xs);
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--llamb-font-size-xl);
+  line-height: 1;
+  padding: 0;
+  opacity: 0.7;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--llamb-radius-full);
+  transition: all var(--llamb-transition-normal);
+}
+
+.llamb-chip-close:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Status Indicators */
+.llamb-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--llamb-spacing-sm);
+  font-size: var(--llamb-font-size-sm);
+}
+
+.llamb-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--llamb-radius-full);
+  background: var(--llamb-text-tertiary);
+}
+
+.llamb-status-connected .llamb-status-dot {
+  background: #22c55e;
+}
+
+.llamb-status-error .llamb-status-dot {
+  background: #ef4444;
+}
+
+/* Lists */
+.llamb-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.llamb-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--llamb-spacing-md);
+  padding: var(--llamb-spacing-md);
+  border-bottom: 1px solid var(--llamb-border);
+  transition: background var(--llamb-transition-fast);
+}
+
+.llamb-list-item:hover {
+  background: var(--llamb-bg-tertiary);
+}
+
+.llamb-list-item:last-child {
+  border-bottom: none;
+}
+
+/* ============================================================================
+   Utility Classes
+   ============================================================================ */
+
+/* Flexbox Utilities */
+.llamb-flex {
+  display: flex;
+}
+
+.llamb-flex-center {
+  display: flex;
+  align-items: center;
+}
+
+.llamb-flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.llamb-flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.llamb-flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.llamb-flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+/* Spacing Utilities */
+.llamb-gap-xs { gap: var(--llamb-spacing-xs); }
+.llamb-gap-sm { gap: var(--llamb-spacing-sm); }
+.llamb-gap-md { gap: var(--llamb-spacing-md); }
+.llamb-gap-lg { gap: var(--llamb-spacing-lg); }
+.llamb-gap-xl { gap: var(--llamb-spacing-xl); }
+
+.llamb-p-0 { padding: 0; }
+.llamb-p-sm { padding: var(--llamb-spacing-sm); }
+.llamb-p-md { padding: var(--llamb-spacing-md); }
+.llamb-p-lg { padding: var(--llamb-spacing-lg); }
+
+.llamb-m-0 { margin: 0; }
+.llamb-m-sm { margin: var(--llamb-spacing-sm); }
+.llamb-m-md { margin: var(--llamb-spacing-md); }
+.llamb-m-lg { margin: var(--llamb-spacing-lg); }
+
+/* Text Utilities */
+.llamb-text-xs { font-size: var(--llamb-font-size-xs); }
+.llamb-text-sm { font-size: var(--llamb-font-size-sm); }
+.llamb-text-base { font-size: var(--llamb-font-size-base); }
+.llamb-text-md { font-size: var(--llamb-font-size-md); }
+.llamb-text-lg { font-size: var(--llamb-font-size-lg); }
+
+.llamb-text-primary { color: var(--llamb-text-primary); }
+.llamb-text-secondary { color: var(--llamb-text-secondary); }
+.llamb-text-tertiary { color: var(--llamb-text-tertiary); }
+
+.llamb-font-normal { font-weight: var(--llamb-font-weight-normal); }
+.llamb-font-medium { font-weight: var(--llamb-font-weight-medium); }
+.llamb-font-semibold { font-weight: var(--llamb-font-weight-semibold); }
+
+/* Visibility Utilities */
+.llamb-hidden { display: none !important; }
+.llamb-invisible { opacity: 0; }
+
+/* ============================================================================
+   Animation Classes
+   ============================================================================ */
+
+.llamb-fade-in {
+  animation: llamb-fade-in 0.3s ease-in;
+}
+
+@keyframes llamb-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.llamb-transition-all {
+  transition: all var(--llamb-transition-fast);
+}
+
+.llamb-transition-smooth {
+  transition: all var(--llamb-transition-smooth);
+}
+
+/* ============================================================================
+   Responsive Utilities
+   ============================================================================ */
+
+/* ============================================================================
+   Quick Actions Management UI
+   ============================================================================ */
+
+/* Section Header for Actions */
+.llamb-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--llamb-spacing-md);
+}
+
+.llamb-btn-sm {
+  padding: var(--llamb-spacing-xs) var(--llamb-spacing-sm);
+  font-size: var(--llamb-font-size-xs);
+  min-width: auto;
+}
+
+/* Quick Actions Container */
+.llamb-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--llamb-spacing-sm);
+}
+
+/* Action Management List */
+.llamb-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--llamb-spacing-sm);
+  margin-bottom: var(--llamb-spacing-xl);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.llamb-action-item {
+  display: flex;
+  align-items: center;
+  gap: var(--llamb-spacing-md);
+  padding: var(--llamb-spacing-md);
+  border: 1px solid var(--llamb-border);
+  border-radius: var(--llamb-radius-lg);
+  background: var(--llamb-bg-secondary);
+  transition: all var(--llamb-transition-fast);
+}
+
+.llamb-action-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.llamb-action-info {
+  display: flex;
+  align-items: center;
+  gap: var(--llamb-spacing-md);
+  flex: 1;
+  min-width: 0;
+}
+
+.llamb-action-icon {
+  font-size: var(--llamb-font-size-lg);
+  flex-shrink: 0;
+}
+
+.llamb-action-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.llamb-action-label {
+  font-weight: var(--llamb-font-weight-medium);
+  font-size: var(--llamb-font-size-base);
+  color: var(--llamb-text-primary);
+  margin-bottom: 2px;
+}
+
+.llamb-action-preview {
+  font-size: var(--llamb-font-size-xs);
+  color: var(--llamb-text-secondary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.llamb-action-controls {
+  display: flex;
+  gap: var(--llamb-spacing-xs);
+  flex-shrink: 0;
+}
+
+/* Actions Toolbar */
+.llamb-actions-toolbar {
+  display: flex;
+  gap: var(--llamb-spacing-sm);
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+/* Modal Enhancements */
+.llamb-modal {
+  min-width: 500px;
+  max-width: 600px;
+}
+
+/* Form Enhancements */
+.llamb-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--llamb-spacing-lg);
+}
+
+.llamb-form-group textarea.llamb-input {
+  resize: vertical;
+  min-height: 120px;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.llamb-help-text {
+  font-size: var(--llamb-font-size-xs);
+  color: var(--llamb-text-secondary);
+  margin-top: var(--llamb-spacing-xs);
+  line-height: 1.3;
+}
+
+.llamb-help-text code {
+  background: var(--llamb-bg-tertiary);
+  padding: 2px 4px;
+  border-radius: var(--llamb-radius-sm);
+  font-size: var(--llamb-font-size-xs);
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+/* Checkbox Wrapper */
+.llamb-checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--llamb-spacing-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.llamb-checkbox-wrapper input[type="checkbox"] {
+  margin: 0;
+}
+
+.llamb-checkbox-label {
+  font-size: var(--llamb-font-size-base);
+  color: var(--llamb-text-primary);
+}
+
+/* Help Details */
+.llamb-help-details {
+  border: 1px solid var(--llamb-border);
+  border-radius: var(--llamb-radius-md);
+  background: var(--llamb-bg-tertiary);
+}
+
+.llamb-help-details summary {
+  padding: var(--llamb-spacing-md);
+  cursor: pointer;
+  font-weight: var(--llamb-font-weight-medium);
+  font-size: var(--llamb-font-size-base);
+  color: var(--llamb-text-primary);
+  user-select: none;
+}
+
+.llamb-help-details[open] summary {
+  border-bottom: 1px solid var(--llamb-border);
+}
+
+.llamb-help-content {
+  padding: var(--llamb-spacing-md);
+  font-size: var(--llamb-font-size-sm);
+  color: var(--llamb-text-secondary);
+  line-height: 1.4;
+}
+
+.llamb-help-content ul {
+  margin: var(--llamb-spacing-sm) 0;
+  padding-left: var(--llamb-spacing-lg);
+}
+
+.llamb-help-content li {
+  margin: var(--llamb-spacing-xs) 0;
+}
+
+.llamb-help-content p {
+  margin: var(--llamb-spacing-md) 0;
+}
+
+.llamb-help-content strong {
+  color: var(--llamb-text-primary);
+  font-weight: var(--llamb-font-weight-medium);
+}
+
+/* Modal Active State */
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-overlay.active .modal {
+  transform: translateY(0);
+}
+
+/* Danger Button Style */
+.btn-danger {
+  color: #dc3545 !important;
+  border-color: #dc3545 !important;
+}
+
+.btn-danger:hover {
+  background: #f8d7da !important;
+  color: #721c24 !important;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .llamb-header {
+    padding: var(--llamb-spacing-lg);
+  }
+  
+  .llamb-section {
+    padding: var(--llamb-spacing-lg);
+  }
+  
+  .llamb-form-group-2col {
+    grid-template-columns: 1fr;
+  }
+  
+  .llamb-modal {
+    min-width: 90%;
+    max-width: 95%;
+    margin: var(--llamb-spacing-md);
+  }
+  
+  .llamb-actions-toolbar {
+    flex-direction: column;
+  }
+  
+  .llamb-action-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--llamb-spacing-sm);
+  }
+  
+  .llamb-action-controls {
+    justify-content: center;
+  }
+}

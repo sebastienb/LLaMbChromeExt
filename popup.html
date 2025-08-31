@@ -2,218 +2,185 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <link rel="stylesheet" href="llamb-ui.css">
     <style>
         body {
-            width: 320px;
+            min-width: 320px;
+            max-width: 480px;
+            width: 100%;
             padding: 0;
-            margin: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 14px;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 16px 20px;
-            text-align: center;
-        }
-
-        .header h1 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .header .subtitle {
-            margin: 4px 0 0 0;
-            font-size: 12px;
-            opacity: 0.9;
-        }
-
-        .content {
-            padding: 20px;
-        }
-
-        .quick-actions {
-            margin-bottom: 24px;
-        }
-
-        .quick-actions h3 {
-            margin: 0 0 12px 0;
-            font-size: 14px;
-            font-weight: 600;
-            color: #202124;
-        }
-
-        .action-button {
-            width: 100%;
-            padding: 12px 16px;
-            margin-bottom: 8px;
-            background: white;
-            border: 1px solid #e8eaed;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.2s;
-        }
-
-        .action-button:hover {
-            background: #f8f9fa;
-            border-color: #667eea;
-        }
-
-        .action-button.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-        }
-
-        .action-button.primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-        }
-
-        .settings-section {
-            border-top: 1px solid #e8eaed;
-            padding-top: 16px;
-        }
-
-        .settings-section h3 {
-            margin: 0 0 12px 0;
-            font-size: 14px;
-            font-weight: 600;
-            color: #202124;
-        }
-
-        .setting-item {
-            margin-bottom: 12px;
-        }
-
-        .setting-item label {
-            display: block;
-            margin-bottom: 4px;
-            font-size: 12px;
-            color: #5f6368;
-            font-weight: 500;
-        }
-
-        .setting-item select, .setting-item input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #e8eaed;
-            border-radius: 6px;
-            font-size: 14px;
+            margin: 0 auto;
             box-sizing: border-box;
         }
-
-        .setting-item select:focus, .setting-item input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
-            background: #e8f5e8;
-            border-radius: 6px;
-            font-size: 12px;
-            color: #137333;
-            margin-top: 12px;
-        }
-
-        .status-indicator.disconnected {
-            background: #fce8e6;
-            color: #d93025;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #34a853;
-        }
-
-        .status-indicator.disconnected .status-dot {
-            background: #ea4335;
-        }
-
-        .footer {
-            padding: 12px 20px;
-            border-top: 1px solid #e8eaed;
-            background: #f8f9fa;
+        
+        .popup-header {
             text-align: center;
         }
-
+        
+        .popup-footer {
+            padding: var(--llamb-spacing-md) var(--llamb-spacing-xl);
+            border-top: 1px solid var(--llamb-border);
+            background: var(--llamb-bg-tertiary);
+            text-align: center;
+        }
+        
         .footer-links {
             display: flex;
             justify-content: center;
-            gap: 16px;
-            font-size: 12px;
+            gap: var(--llamb-spacing-lg);
+            font-size: var(--llamb-font-size-sm);
         }
-
+        
         .footer-links a {
-            color: #5f6368;
+            color: var(--llamb-text-secondary);
             text-decoration: none;
+            transition: color var(--llamb-transition-fast);
         }
-
+        
         .footer-links a:hover {
-            color: #667eea;
+            color: var(--llamb-text-primary);
         }
     </style>
 </head>
-<body>
-    <div class="header">
-        <h1>🦙 LlamB Assistant</h1>
-        <div class="subtitle">AI Chat with webpage context</div>
+<body class="llamb-root">
+    <div class="llamb-header popup-header">
+        <div class="llamb-header-title">
+            <span>🦙</span>
+            <div>
+                <div>LlamB Assistant</div>
+                <div class="llamb-text-secondary llamb-text-sm">AI Chat with webpage context</div>
+            </div>
+        </div>
     </div>
 
-    <div class="content">
-        <div class="quick-actions">
-            <h3>Quick Actions</h3>
-            <button class="action-button primary" id="toggle-sidebar">
-                💬 Toggle Chat Sidebar
-            </button>
-            <button class="action-button" id="analyze-page">
-                📄 Analyze Current Page
-            </button>
-            <button class="action-button" id="summarize-selection">
-                ✨ Summarize Selection
-            </button>
+    <div class="llamb-content">
+        <div class="llamb-section">
+            <div class="llamb-section-header">
+                <div class="llamb-section-title">Quick Actions</div>
+                <button class="llamb-btn llamb-btn-sm" id="customize-actions-btn" title="Customize Actions">
+                    ⚙️
+                </button>
+            </div>
+            <div class="llamb-button-group">
+                <button class="llamb-btn llamb-btn-primary llamb-btn-full" id="toggle-sidebar">
+                    💬 Toggle Chat Sidebar
+                </button>
+                <div class="llamb-quick-actions" id="quick-actions-container">
+                    <!-- Dynamic quick actions will be loaded here -->
+                </div>
+            </div>
         </div>
 
-        <div class="settings-section">
-            <h3>Settings</h3>
+        <div class="llamb-section">
+            <div class="llamb-section-title">Settings</div>
             
-            <div class="setting-item">
-                <label for="connection-select">Active Connection</label>
-                <select id="connection-select">
+            <div class="llamb-form-group">
+                <label class="llamb-label" for="connection-select">Active Connection</label>
+                <select class="llamb-input llamb-select" id="connection-select">
                     <option value="">No connections configured</option>
                 </select>
             </div>
 
-            <div class="setting-item">
-                <button class="action-button" id="manage-connections-btn">
+            <div class="llamb-form-group">
+                <button class="llamb-btn llamb-btn-full" id="manage-connections-btn">
                     ⚙️ Manage Connections
                 </button>
             </div>
 
-            <div class="status-indicator" id="connection-status">
-                <div class="status-dot"></div>
+            <div class="llamb-status" id="connection-status">
+                <div class="llamb-status-dot"></div>
                 <span>Loading...</span>
             </div>
         </div>
     </div>
 
-    <div class="footer">
+    <div class="popup-footer">
         <div class="footer-links">
             <a href="#" id="help-link">Help</a>
-            <a href="#" id="settings-link">Advanced Settings</a>
+            <a href="#" id="settings-link">Settings</a>
             <a href="#" id="feedback-link">Feedback</a>
+        </div>
+    </div>
+
+    <!-- Quick Actions Manager Modal -->
+    <div class="modal-overlay" id="actions-modal">
+        <div class="modal llamb-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Customize Quick Actions</h3>
+                <button class="modal-close" id="close-actions-modal">×</button>
+            </div>
+            <div class="modal-content">
+                <div class="llamb-actions-list" id="actions-list">
+                    <!-- Actions list will be populated here -->
+                </div>
+                <div class="llamb-actions-toolbar">
+                    <button class="llamb-btn" id="add-action-btn">➕ Add New Action</button>
+                    <button class="llamb-btn" id="restore-defaults-btn">🔄 Restore Defaults</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Editor Modal -->
+    <div class="modal-overlay" id="action-editor-modal">
+        <div class="modal llamb-modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="editor-modal-title">Add New Action</h3>
+                <button class="modal-close" id="close-editor-modal">×</button>
+            </div>
+            <div class="modal-content">
+                <form id="action-editor-form" class="llamb-form">
+                    <div class="llamb-form-group">
+                        <label class="llamb-label" for="action-label">Action Label</label>
+                        <input type="text" id="action-label" class="llamb-input" placeholder="Summarize this page" required>
+                    </div>
+                    
+                    <div class="llamb-form-group">
+                        <label class="llamb-label" for="action-icon">Icon (emoji)</label>
+                        <input type="text" id="action-icon" class="llamb-input" placeholder="📝" maxlength="4">
+                    </div>
+                    
+                    <div class="llamb-form-group">
+                        <label class="llamb-label" for="action-prompt">Prompt Template</label>
+                        <textarea id="action-prompt" class="llamb-input" rows="6" 
+                                  placeholder="Please summarize this webpage:&#10;Title: {pageTitle}&#10;URL: {pageUrl}&#10;&#10;Content:&#10;{pageContent}&#10;&#10;Provide a concise summary." required></textarea>
+                        <small class="llamb-help-text">
+                            Available variables: <code>{pageTitle}</code>, <code>{pageUrl}</code>, <code>{pageContent}</code>, <code>{selectedText}</code>
+                        </small>
+                    </div>
+                    
+                    <div class="llamb-form-group">
+                        <label class="llamb-checkbox-wrapper">
+                            <input type="checkbox" id="action-use-context" checked>
+                            <span class="llamb-checkbox-label">Use page context (recommended for most actions)</span>
+                        </label>
+                    </div>
+                    
+                    <div class="llamb-form-group">
+                        <details class="llamb-help-details">
+                            <summary>📖 Template Variables Guide</summary>
+                            <div class="llamb-help-content">
+                                <ul>
+                                    <li><strong>{pageTitle}</strong> - The current page's title</li>
+                                    <li><strong>{pageUrl}</strong> - The current page's URL</li>
+                                    <li><strong>{pageContent}</strong> - The main content of the page</li>
+                                    <li><strong>{selectedText}</strong> - Any text selected by the user</li>
+                                </ul>
+                                <p><strong>Tips:</strong></p>
+                                <ul>
+                                    <li>Use clear, specific instructions in your prompts</li>
+                                    <li>Enable "Use page context" for actions that need page information</li>
+                                    <li>Test your actions after creating them</li>
+                                </ul>
+                            </div>
+                        </details>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="llamb-btn" id="cancel-editor-btn">Cancel</button>
+                <button type="submit" form="action-editor-form" class="llamb-btn llamb-btn-primary" id="save-action-btn">Save Action</button>
+            </div>
         </div>
     </div>
 

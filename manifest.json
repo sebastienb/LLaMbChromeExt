@@ -43,6 +43,7 @@
         "sidebar.js",
         "settings.html",
         "js/storage-manager.js",
+        "js/chat-manager.js",
         "js/llm-manager.js",
         "js/llm-providers.js",
         "js/stream-parser.js",

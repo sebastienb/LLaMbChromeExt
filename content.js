@@ -12,6 +12,12 @@
   let isVisible = false;
   let preservedSelections = []; // Array to store multiple selections
   let selectionCounter = 0;
+  
+  // Chat management
+  let chatManager = null;
+  let storageManager = null;
+  let currentChat = null;
+  let tabId = null;
 
   // Cache for page content to avoid re-extraction
   let pageContentCache = {
@@ -19,6 +25,537 @@
     content: null,
     timestamp: null
   };
+
+  // Load required scripts
+  async function loadRequiredScripts() {
+    try {
+      // Load StorageManager - but check if it's already available and working
+      if (typeof StorageManager === 'undefined' || !StorageManager.prototype.getSidebarState) {
+        const storageScript = document.createElement('script');
+        storageScript.src = chrome.runtime.getURL('js/storage-manager.js');
+        document.head.appendChild(storageScript);
+        await new Promise((resolve, reject) => {
+          storageScript.onload = resolve;
+          storageScript.onerror = reject;
+        });
+      }
+      
+      // Load ChatManager
+      if (typeof ChatManager === 'undefined') {
+        console.log('LlamB: Loading ChatManager script...');
+        const chatScript = document.createElement('script');
+        chatScript.src = chrome.runtime.getURL('js/chat-manager.js');
+        document.head.appendChild(chatScript);
+        await new Promise((resolve, reject) => {
+          chatScript.onload = () => {
+            console.log('LlamB: ChatManager script loaded, checking availability...');
+            console.log('LlamB: ChatManager type after load:', typeof ChatManager);
+            resolve();
+          };
+          chatScript.onerror = (error) => {
+            console.error('LlamB: Failed to load ChatManager script:', error);
+            reject(error);
+          };
+        });
+      }
+      
+      console.log('LlamB: Required scripts loaded');
+      console.log('LlamB: StorageManager available:', typeof StorageManager);
+      console.log('LlamB: ChatManager available:', typeof ChatManager);
+    } catch (error) {
+      console.error('LlamB: Error loading scripts:', error);
+    }
+  }
+
+  // Initialize chat and storage managers
+  async function initializeManagers() {
+    try {
+      await loadRequiredScripts();
+      
+      // Get current tab ID
+      console.log('LlamB: Requesting current tab from background...');
+      const response = await chrome.runtime.sendMessage({ action: 'getCurrentTab' });
+      console.log('LlamB: getCurrentTab response:', response);
+      
+      if (response && response.success && response.tab) {
+        tabId = response.tab.id;
+        console.log('LlamB: Got tabId from background:', tabId);
+      } else {
+        // Fallback: try to get tab info directly if possible
+        console.log('LlamB: Background getCurrentTab failed, trying fallback...');
+        tabId = Math.floor(Math.random() * 1000000); // Generate a session ID as fallback
+        console.log('LlamB: Using fallback tabId:', tabId);
+      }
+      
+      // Initialize managers with error handling
+      if (typeof ChatManager !== 'undefined') {
+        try {
+          chatManager = new ChatManager();
+          console.log('LlamB: ChatManager initialized successfully');
+        } catch (error) {
+          console.error('LlamB: Error creating ChatManager:', error);
+          chatManager = null;
+        }
+      } else {
+        console.warn('LlamB: ChatManager class not available');
+      }
+      
+      if (typeof StorageManager !== 'undefined') {
+        try {
+          // Check if StorageManager has our custom methods
+          if (StorageManager.prototype.getSidebarState) {
+            storageManager = new StorageManager();
+            console.log('LlamB: StorageManager initialized successfully');
+          } else {
+            console.warn('LlamB: StorageManager exists but missing custom methods, skipping');
+            storageManager = null;
+          }
+        } catch (error) {
+          console.error('LlamB: Error creating StorageManager:', error);
+          console.log('LlamB: Trying to use basic functionality without custom StorageManager');
+          storageManager = null;
+        }
+      } else {
+        console.warn('LlamB: StorageManager class not available');
+      }
+      
+      console.log('LlamB: Managers initialized, tabId:', tabId);
+      console.log('LlamB: ChatManager ready:', !!chatManager);
+      console.log('LlamB: StorageManager ready:', !!storageManager);
+    } catch (error) {
+      console.error('LlamB: Error initializing managers:', error);
+    }
+  }
+
+  // Restore sidebar state from storage
+  async function restoreSidebarState() {
+    if (!tabId) {
+      console.log('LlamB: No tabId available for state restoration');
+      return;
+    }
+    
+    if (!storageManager) {
+      console.log('LlamB: No storageManager available, skipping state restoration');
+      return;
+    }
+    
+    try {
+      const sidebarState = await storageManager.getSidebarState(tabId);
+      console.log('LlamB: Restored sidebar state:', sidebarState);
+      
+      if (sidebarState.isVisible) {
+        // Create sidebar if it doesn't exist
+        if (!sidebar) {
+          sidebar = createSidebar();
+          setupEventListeners();
+          detectAndApplyTheme();
+        }
+        
+        // Restore visibility
+        isVisible = true;
+        sidebar.className = 'llamb-sidebar-visible';
+        document.body.classList.remove('llamb-sidebar-closed');
+        document.body.classList.add('llamb-sidebar-open');
+        
+        // Restore chat if specified
+        if (sidebarState.chatId && chatManager) {
+          await loadChat(sidebarState.chatId);
+        }
+      }
+    } catch (error) {
+      console.error('LlamB: Error restoring sidebar state:', error);
+    }
+  }
+
+  // Save current sidebar state
+  async function saveSidebarState() {
+    if (!tabId) {
+      console.log('LlamB: No tabId available for state saving');
+      return;
+    }
+    
+    if (!storageManager) {
+      console.log('LlamB: No storageManager available, skipping state save');
+      return;
+    }
+    
+    try {
+      const chatId = currentChat ? currentChat.id : null;
+      await storageManager.setSidebarState(tabId, isVisible, chatId);
+    } catch (error) {
+      console.error('LlamB: Error saving sidebar state:', error);
+    }
+  }
+
+  // Load chat into sidebar
+  async function loadChat(chatId) {
+    if (!chatManager || !chatId) return;
+    
+    try {
+      const chat = await chatManager.loadChat(chatId);
+      if (!chat) {
+        console.warn('LlamB: Chat not found:', chatId);
+        return;
+      }
+      
+      currentChat = chat;
+      chatManager.setActiveChat(chat);
+      
+      // Clear current messages and load chat history
+      const messagesContainer = document.getElementById('llamb-messages');
+      if (messagesContainer) {
+        messagesContainer.innerHTML = '';
+        
+        // Add all messages from chat history
+        chat.messages.forEach(message => {
+          addMessageToUI(message.role, message.content, message.sourceUrl);
+        });
+        
+        // Scroll to bottom
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+      
+      // Hide suggested actions if there are messages
+      const suggestedActions = document.getElementById('llamb-suggested-actions');
+      if (suggestedActions && chat.messages.length > 0) {
+        suggestedActions.classList.add('hidden');
+      }
+      
+      console.log('LlamB: Loaded chat:', chatId);
+    } catch (error) {
+      console.error('LlamB: Error loading chat:', error);
+    }
+  }
+
+  // Create new chat
+  async function createNewChat(initialMessage = null, pageContext = null) {
+    if (!chatManager) return null;
+    
+    try {
+      const chat = await chatManager.createChat(initialMessage, pageContext);
+      currentChat = chat;
+      chatManager.setActiveChat(chat);
+      
+      console.log('LlamB: Created new chat:', chat.id);
+      return chat;
+    } catch (error) {
+      console.error('LlamB: Error creating new chat:', error);
+      return null;
+    }
+  }
+
+  // Add message to UI
+  function addMessageToUI(role, content, sourceUrl = null) {
+    const messagesContainer = document.getElementById('llamb-messages');
+    if (!messagesContainer) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `llamb-message-container llamb-${role}-container`;
+    
+    const avatar = role === 'user' ? 'You' : 'AI';
+    const bubbleClass = role === 'user' ? 'llamb-user-bubble' : 'llamb-assistant-bubble';
+    
+    messageDiv.innerHTML = `
+      <div class="llamb-message-avatar">
+        <div class="llamb-avatar llamb-${role}-avatar">${avatar}</div>
+      </div>
+      <div class="llamb-message-bubble ${bubbleClass}">
+        <div class="llamb-message-content">${role === 'user' ? renderMarkdown(content) : content}</div>
+        ${sourceUrl ? `<div class="llamb-message-source"><small>Source: ${sourceUrl}</small></div>` : ''}
+      </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  // History dropdown management
+  let cachedChatHistory = [];
+
+  async function toggleHistoryDropdown() {
+    const dropdown = document.getElementById('llamb-history-dropdown');
+    if (!dropdown) return;
+    
+    const isVisible = dropdown.style.display !== 'none';
+    
+    if (isVisible) {
+      hideHistoryDropdown();
+    } else {
+      await showHistoryDropdown();
+    }
+  }
+
+  async function showHistoryDropdown() {
+    const dropdown = document.getElementById('llamb-history-dropdown');
+    if (!dropdown) return;
+    
+    dropdown.style.display = 'block';
+    
+    // Load chat history
+    await loadChatHistory();
+  }
+
+  function hideHistoryDropdown() {
+    const dropdown = document.getElementById('llamb-history-dropdown');
+    if (!dropdown) return;
+    
+    dropdown.style.display = 'none';
+    
+    // Clear search
+    const searchInput = document.getElementById('llamb-history-search');
+    if (searchInput) {
+      searchInput.value = '';
+    }
+  }
+
+  async function loadChatHistory() {
+    const historyList = document.getElementById('llamb-history-list');
+    if (!historyList) return;
+    
+    try {
+      historyList.innerHTML = '<div class="llamb-loading">Loading chat history...</div>';
+      
+      console.log('LlamB: Requesting chat history from background...');
+      const response = await chrome.runtime.sendMessage({ action: 'getChatHistory' });
+      console.log('LlamB: Chat history response:', response);
+      
+      if (!response) {
+        throw new Error('No response from background script');
+      }
+      
+      if (!response.success) {
+        // Try direct storage access as fallback
+        console.log('LlamB: Background failed, trying direct storage access...');
+        try {
+          const result = await chrome.storage.local.get('llamb-chats');
+          const chats = result['llamb-chats'] || [];
+          cachedChatHistory = chats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+          console.log('LlamB: Loaded', cachedChatHistory.length, 'chats from direct storage');
+          renderChatHistory(cachedChatHistory);
+          return;
+        } catch (directError) {
+          throw new Error(`Background: ${response.error || 'Unknown error'}, Direct: ${directError.message}`);
+        }
+      }
+      
+      cachedChatHistory = response.chatHistory || [];
+      console.log('LlamB: Loaded', cachedChatHistory.length, 'chats from background');
+      renderChatHistory(cachedChatHistory);
+      
+    } catch (error) {
+      console.error('LlamB: Error loading chat history:', error);
+      historyList.innerHTML = `<div class="llamb-error">Failed to load chat history<br><small>${error.message}</small></div>`;
+    }
+  }
+
+  function renderChatHistory(chats) {
+    const historyList = document.getElementById('llamb-history-list');
+    if (!historyList) return;
+    
+    if (chats.length === 0) {
+      historyList.innerHTML = '<div class="llamb-empty">No chat history found</div>';
+      return;
+    }
+    
+    // Group chats by domain
+    const currentDomain = new URL(window.location.href).hostname;
+    const currentDomainChats = chats.filter(chat => 
+      chat.urls.some(url => {
+        try {
+          return new URL(url).hostname === currentDomain;
+        } catch {
+          return false;
+        }
+      })
+    );
+    
+    const otherChats = chats.filter(chat => !currentDomainChats.includes(chat));
+    
+    historyList.innerHTML = '';
+    
+    // Add current domain chats first
+    if (currentDomainChats.length > 0) {
+      const domainHeader = document.createElement('div');
+      domainHeader.className = 'llamb-history-group-header';
+      domainHeader.textContent = `From ${currentDomain}`;
+      historyList.appendChild(domainHeader);
+      
+      currentDomainChats.slice(0, 5).forEach(chat => {
+        historyList.appendChild(createChatHistoryItem(chat));
+      });
+    }
+    
+    // Add other chats
+    if (otherChats.length > 0) {
+      const recentHeader = document.createElement('div');
+      recentHeader.className = 'llamb-history-group-header';
+      recentHeader.textContent = 'Recent Chats';
+      historyList.appendChild(recentHeader);
+      
+      otherChats.slice(0, 10).forEach(chat => {
+        historyList.appendChild(createChatHistoryItem(chat));
+      });
+    }
+  }
+
+  function createChatHistoryItem(chat) {
+    const item = document.createElement('div');
+    item.className = 'llamb-history-item';
+    item.dataset.chatId = chat.id;
+    
+    const date = new Date(chat.updatedAt).toLocaleDateString();
+    const time = new Date(chat.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const sourceCount = chat.urls.length;
+    
+    item.innerHTML = `
+      <div class="llamb-history-item-main">
+        <div class="llamb-history-item-title">${escapeHtml(chat.title)}</div>
+        <div class="llamb-history-item-meta">
+          <span class="llamb-history-date">${date} ${time}</span>
+          ${sourceCount > 0 ? `<span class="llamb-history-sources">${sourceCount} source${sourceCount > 1 ? 's' : ''}</span>` : ''}
+          <span class="llamb-history-messages">${chat.messageCount} messages</span>
+        </div>
+      </div>
+      <div class="llamb-history-item-actions">
+        <button class="llamb-history-load" title="Load Chat">💬</button>
+        <button class="llamb-history-delete" title="Delete Chat">🗑️</button>
+      </div>
+    `;
+    
+    // Add event listeners
+    const loadBtn = item.querySelector('.llamb-history-load');
+    const deleteBtn = item.querySelector('.llamb-history-delete');
+    
+    item.addEventListener('click', () => loadChatFromHistory(chat.id));
+    loadBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      loadChatFromHistory(chat.id);
+    });
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteChatFromHistory(chat.id);
+    });
+    
+    return item;
+  }
+
+  async function loadChatFromHistory(chatId) {
+    try {
+      // Try using ChatManager first
+      if (chatManager) {
+        await loadChat(chatId);
+      } else {
+        // Fallback: request chat from background script
+        console.log('LlamB: No ChatManager, requesting chat from background...');
+        const response = await chrome.runtime.sendMessage({ action: 'loadChat', chatId: chatId });
+        
+        if (response && response.success && response.chat) {
+          // Manually load the chat into UI
+          currentChat = response.chat;
+          
+          // Clear current messages and load chat history
+          const messagesContainer = document.getElementById('llamb-messages');
+          if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+            
+            // Add all messages from chat history
+            response.chat.messages.forEach(message => {
+              addMessageToUI(message.role, message.content, message.sourceUrl);
+            });
+            
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
+          
+          // Hide suggested actions if there are messages
+          const suggestedActions = document.getElementById('llamb-suggested-actions');
+          if (suggestedActions && response.chat.messages.length > 0) {
+            suggestedActions.classList.add('hidden');
+          }
+        } else {
+          throw new Error(response?.error || 'Failed to load chat from background');
+        }
+      }
+      
+      hideHistoryDropdown();
+      console.log('LlamB: Loaded chat from history:', chatId);
+    } catch (error) {
+      console.error('LlamB: Error loading chat from history:', error);
+      alert('Failed to load chat: ' + error.message);
+    }
+  }
+
+  async function deleteChatFromHistory(chatId) {
+    if (!confirm('Are you sure you want to delete this chat?')) return;
+    
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'deleteChat',
+        chatId: chatId
+      });
+      
+      if (response.success) {
+        // Remove from UI
+        const item = document.querySelector(`[data-chat-id="${chatId}"]`);
+        if (item) {
+          item.remove();
+        }
+        
+        // Remove from cache
+        cachedChatHistory = cachedChatHistory.filter(chat => chat.id !== chatId);
+        
+        // If this was the current chat, clear it
+        if (currentChat && currentChat.id === chatId) {
+          currentChat = null;
+          if (chatManager) {
+            chatManager.clearActiveChat();
+          }
+          clearChat();
+        }
+        
+        console.log('LlamB: Deleted chat from history:', chatId);
+      } else {
+        throw new Error(response.error || 'Failed to delete chat');
+      }
+    } catch (error) {
+      console.error('LlamB: Error deleting chat from history:', error);
+      alert('Failed to delete chat: ' + error.message);
+    }
+  }
+
+  function filterChatHistory(query) {
+    if (!query.trim()) {
+      renderChatHistory(cachedChatHistory);
+      return;
+    }
+    
+    const filteredChats = cachedChatHistory.filter(chat => 
+      chat.title.toLowerCase().includes(query.toLowerCase()) ||
+      chat.urls.some(url => url.toLowerCase().includes(query.toLowerCase()))
+    );
+    
+    renderChatHistory(filteredChats);
+  }
+
+  async function startNewChat() {
+    try {
+      // Clear current chat
+      currentChat = null;
+      if (chatManager) {
+        chatManager.clearActiveChat();
+      }
+      
+      // Clear messages UI
+      clearChat();
+      
+      // Save state
+      saveSidebarState();
+      
+      console.log('LlamB: Started new chat');
+    } catch (error) {
+      console.error('LlamB: Error starting new chat:', error);
+    }
+  }
 
   // Theme management
   let currentTheme = null;
@@ -415,6 +952,33 @@
     }
   }
 
+  // Get site favicon
+  function getSiteFavicon() {
+    // Try to find favicon from various sources in order of preference
+    const selectors = [
+      'link[rel*="icon"][sizes*="32"]',  // 32x32 favicon
+      'link[rel*="icon"][sizes*="16"]',  // 16x16 favicon  
+      'link[rel="shortcut icon"]',       // Shortcut icon
+      'link[rel="icon"]',                // Generic icon
+      'link[rel="apple-touch-icon"]'     // Apple touch icon as fallback
+    ];
+    
+    for (const selector of selectors) {
+      const favicon = document.querySelector(selector);
+      if (favicon && favicon.href) {
+        return favicon.href;
+      }
+    }
+    
+    // Fallback to default favicon.ico
+    try {
+      const url = new URL('/favicon.ico', window.location.origin);
+      return url.href;
+    } catch {
+      return null;
+    }
+  }
+
   // Update context chips display
   function updateContextChips() {
     const chipsContainer = document.getElementById('llamb-context-chips');
@@ -422,8 +986,19 @@
     
     // Update page chip
     const pageChip = chipsContainer.querySelector('.llamb-chip-page .llamb-chip-text');
+    const pageChipIcon = chipsContainer.querySelector('.llamb-chip-page .llamb-chip-icon');
     if (pageChip) {
       pageChip.textContent = document.title || 'Current page';
+    }
+    if (pageChipIcon) {
+      const favicon = getSiteFavicon();
+      if (favicon) {
+        // Replace emoji with favicon image
+        pageChipIcon.innerHTML = `<img src="${favicon}" alt="Site icon" style="width: 16px; height: 16px;" onerror="this.style.display='none'; this.parentElement.innerHTML = '📄';">`;
+      } else {
+        // Fallback to page icon
+        pageChipIcon.textContent = '📄';
+      }
     }
     
     // Remove existing selection chips
@@ -481,6 +1056,16 @@
           <span>LlamB Assistant</span>
         </div>
         <div class="llamb-header-actions">
+          <button class="llamb-history-btn" id="llamb-history-btn" title="Chat History">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-history-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+          </button>
+          <button class="llamb-new-chat-btn" id="llamb-new-chat-btn" title="New Chat">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-new-chat-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
           <button class="llamb-theme-toggle" id="llamb-theme-btn" title="Toggle theme">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-theme-icon llamb-theme-light-icon">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
@@ -494,6 +1079,18 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+      </div>
+      <div class="llamb-history-dropdown" id="llamb-history-dropdown" style="display: none;">
+        <div class="llamb-history-header">
+          <span>Chat History</span>
+          <button class="llamb-history-close" id="llamb-history-close">×</button>
+        </div>
+        <div class="llamb-history-search">
+          <input type="text" id="llamb-history-search" placeholder="Search chats..." />
+        </div>
+        <div class="llamb-history-list" id="llamb-history-list">
+          <div class="llamb-loading">Loading chat history...</div>
         </div>
       </div>
       <div class="llamb-sidebar-content">
@@ -526,7 +1123,10 @@
         <div class="llamb-chat-input-container">
           <div class="llamb-context-chips" id="llamb-context-chips">
             <div class="llamb-chip llamb-chip-page">
-              <span class="llamb-chip-icon">📄</span>
+              <span class="llamb-chip-icon">${(() => {
+                const favicon = getSiteFavicon();
+                return favicon ? `<img src="${favicon}" alt="Site icon" style="width: 16px; height: 16px;" onerror="this.style.display='none'; this.parentElement.innerHTML = '📄';">` : '📄';
+              })()}</span>
               <span class="llamb-chip-text" id="page-title">${document.title || 'Current page'}</span>
             </div>
             <button class="llamb-clear-all-btn" id="llamb-clear-all" style="display: none;">Clear All Selections</button>
@@ -596,6 +1196,9 @@
       // Clear all selections when sidebar closes
       clearAllSelections();
     }
+    
+    // Save sidebar state
+    saveSidebarState();
   }
 
   // Setup event listeners
@@ -603,6 +1206,8 @@
     const toggleBtn = document.getElementById('llamb-toggle-btn');
     const closeBtn = document.getElementById('llamb-close-btn');
     const themeBtn = document.getElementById('llamb-theme-btn');
+    const historyBtn = document.getElementById('llamb-history-btn');
+    const newChatBtn = document.getElementById('llamb-new-chat-btn');
     const sendBtn = document.getElementById('llamb-send-btn');
     const chatInput = document.getElementById('llamb-chat-input');
 
@@ -644,6 +1249,24 @@
       });
     }
 
+    if (historyBtn) {
+      historyBtn.addEventListener('click', (e) => {
+        console.log('LlamB: History button clicked!');
+        e.preventDefault();
+        e.stopPropagation();
+        toggleHistoryDropdown();
+      });
+    }
+
+    if (newChatBtn) {
+      newChatBtn.addEventListener('click', (e) => {
+        console.log('LlamB: New chat button clicked!');
+        e.preventDefault();
+        e.stopPropagation();
+        startNewChat();
+      });
+    }
+
     sendBtn.addEventListener('click', sendMessage);
     chatInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -677,6 +1300,23 @@
         e.preventDefault();
         e.stopPropagation();
         clearAllSelections();
+      });
+    }
+
+    // History dropdown event listeners
+    const historyClose = document.getElementById('llamb-history-close');
+    if (historyClose) {
+      historyClose.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hideHistoryDropdown();
+      });
+    }
+
+    const historySearch = document.getElementById('llamb-history-search');
+    if (historySearch) {
+      historySearch.addEventListener('input', (e) => {
+        filterChatHistory(e.target.value);
       });
     }
   }
@@ -741,18 +1381,60 @@
     const sendBtn = document.getElementById('llamb-send-btn');
     sendBtn.disabled = true;
 
-    // Add user message
-    const userMessageDiv = document.createElement('div');
-    userMessageDiv.className = 'llamb-message-container llamb-user-container';
-    userMessageDiv.innerHTML = `
-      <div class="llamb-message-avatar">
-        <div class="llamb-avatar llamb-user-avatar">You</div>
-      </div>
-      <div class="llamb-message-bubble llamb-user-bubble">
-        <div class="llamb-message-content">${renderMarkdown(message)}</div>
-      </div>
-    `;
-    messagesContainer.appendChild(userMessageDiv);
+    // Get page context
+    const pageContext = getPageContext();
+
+    // Create new chat if none exists
+    if (!currentChat) {
+      if (chatManager) {
+        currentChat = await createNewChat();
+        saveSidebarState();
+      } else {
+        // Fallback: create simple chat object
+        console.log('LlamB: No ChatManager, creating simple chat object...');
+        currentChat = {
+          id: 'chat-' + Date.now(),
+          title: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
+          messages: [],
+          urls: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+
+    // Add user message to chat
+    if (currentChat) {
+      if (chatManager) {
+        await chatManager.addMessage(currentChat, 'user', message, pageContext);
+      } else {
+        // Fallback: add message directly to chat object
+        currentChat.messages.push({
+          role: 'user',
+          content: message,
+          timestamp: new Date().toISOString(),
+          sourceUrl: pageContext.url
+        });
+        // Try to save directly to storage
+        try {
+          const result = await chrome.storage.local.get('llamb-chats');
+          const chats = result['llamb-chats'] || [];
+          const existingIndex = chats.findIndex(c => c.id === currentChat.id);
+          if (existingIndex !== -1) {
+            chats[existingIndex] = currentChat;
+          } else {
+            chats.push(currentChat);
+          }
+          await chrome.storage.local.set({ 'llamb-chats': chats });
+          console.log('LlamB: Saved chat to storage (fallback)');
+        } catch (error) {
+          console.error('LlamB: Failed to save chat (fallback):', error);
+        }
+      }
+    }
+
+    // Add user message to UI
+    addMessageToUI('user', message, pageContext.url);
 
     // Clear input
     chatInput.value = '';
@@ -850,7 +1532,7 @@
       const blocksContainer = contentDiv.querySelector('.llamb-blocks-container') || document.createElement('div');
       if (!blocksContainer.parentNode) {
         blocksContainer.className = 'llamb-blocks-container';
-        contentDiv.insertBefore(blocksContainer, textContent);
+        contentDiv.insertBefore(blocksContainer, contentDiv.firstChild);
       }
 
       blocksContainer.innerHTML = '';
@@ -882,11 +1564,45 @@
   }
 
   // Handle stream end
-  function handleStreamEnd(data) {
+  async function handleStreamEnd(data) {
     const assistantMessage = document.querySelector(`[data-request-id="${data.requestId}"]`);
     if (!assistantMessage) return;
 
     console.log('LlamB: Stream ended for request:', data.requestId);
+    
+    // Save assistant message to chat
+    if (currentChat && data.fullContent) {
+      try {
+        if (chatManager) {
+          await chatManager.addMessage(currentChat, 'assistant', data.fullContent);
+          console.log('LlamB: Saved assistant message to chat');
+        } else {
+          // Fallback: add message directly
+          currentChat.messages.push({
+            role: 'assistant',
+            content: data.fullContent,
+            timestamp: new Date().toISOString()
+          });
+          currentChat.updatedAt = new Date().toISOString();
+          
+          // Save to storage
+          const result = await chrome.storage.local.get('llamb-chats');
+          const chats = result['llamb-chats'] || [];
+          const existingIndex = chats.findIndex(c => c.id === currentChat.id);
+          if (existingIndex !== -1) {
+            chats[existingIndex] = currentChat;
+          } else {
+            chats.push(currentChat);
+          }
+          // Sort by updatedAt
+          chats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+          await chrome.storage.local.set({ 'llamb-chats': chats });
+          console.log('LlamB: Saved assistant message to chat (fallback)');
+        }
+      } catch (error) {
+        console.error('LlamB: Error saving assistant message:', error);
+      }
+    }
     
     // Re-enable input
     const chatInput = document.getElementById('llamb-chat-input');
@@ -1083,29 +1799,25 @@
   }).observe(document, { subtree: true, childList: true });
 
   // Initialize
-  document.addEventListener('DOMContentLoaded', () => {
-    // Create toggle button immediately
+  async function initialize() {
+    await initializeManagers();
+    await restoreSidebarState();
+    
+    // Create sidebar if not already created during restoration
     if (!sidebar) {
       sidebar = createSidebar();
       setupEventListeners();
       detectAndApplyTheme();
     }
-  });
+  }
+
+  document.addEventListener('DOMContentLoaded', initialize);
 
   // If DOM is already loaded
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      if (!sidebar) {
-        sidebar = createSidebar();
-        setupEventListeners();
-      }
-    });
+    document.addEventListener('DOMContentLoaded', initialize);
   } else {
-    if (!sidebar) {
-      sidebar = createSidebar();
-      setupEventListeners();
-      detectAndApplyTheme();
-    }
+    initialize();
   }
 
   // Handle window resize to adjust layout

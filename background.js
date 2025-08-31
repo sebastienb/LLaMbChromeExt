@@ -1,23 +1,36 @@
 // Background service worker for LlamB Chrome Extension
 
 // Import LLM management modules
-importScripts(
-  'js/storage-manager.js',
-  'js/stream-parser.js', 
-  'js/llm-providers.js',
-  'js/llm-manager.js'
-);
+try {
+  importScripts(
+    'js/storage-manager.js',
+    'js/chat-manager.js',
+    'js/stream-parser.js', 
+    'js/llm-providers.js',
+    'js/llm-manager.js'
+  );
+  
+  console.log('Background: importScripts completed');
+  console.log('Background: StorageManager available?', typeof StorageManager);
+  console.log('Background: ChatManager available?', typeof ChatManager);
+  console.log('Background: LLMManager available?', typeof LLMManager);
+} catch (error) {
+  console.error('Background: Error importing scripts:', error);
+}
 
-// Initialize LLM Manager
+// Initialize managers
 let llmManager;
+let chatManager;
 
 // Extension installation
 chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('LlamB Chat Assistant installed');
   
-  // Initialize LLM Manager
+  // Initialize managers
   llmManager = new LLMManager();
   await llmManager.initialize();
+  
+  chatManager = new ChatManager();
   
   // Create context menu items
   chrome.contextMenus.create({
@@ -64,11 +77,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 });
 
-// Initialize LLM Manager on startup
+// Initialize managers on startup
 chrome.runtime.onStartup.addListener(async () => {
   if (!llmManager) {
     llmManager = new LLMManager();
     await llmManager.initialize();
+  }
+  if (!chatManager) {
+    chatManager = new ChatManager();
   }
 });
 
@@ -81,12 +97,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         break;
         
       case "quick-settings":
-        // Open popup.html in a new popup window
+        // Open popup.html in a new popup window, sized appropriately
         await chrome.windows.create({
           url: chrome.runtime.getURL('popup.html'),
           type: 'popup',
-          width: 360,
-          height: 600
+          width: 420,   // Comfortable width for the responsive design
+          height: 520   // Appropriate height for all content
         });
         break;
         
@@ -153,6 +169,8 @@ chrome.action.onClicked.addListener(async (tab) => {
 // Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   console.log('Background: Received message:', request.action);
+  console.log('Background: Full request object:', request);
+  console.log('Background: Sender:', sender);
   
   switch (request.action) {
     case 'getPageContext':
@@ -177,6 +195,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
     case 'openSettings':
       handleOpenSettings(sendResponse);
+      return true;
+      
+    case 'getCurrentTab':
+      handleGetCurrentTab(sendResponse);
+      return true;
+      
+    case 'getChatHistory':
+      handleGetChatHistory(sendResponse);
+      return true;
+      
+    case 'loadChat':
+      handleLoadChat(request.chatId, sendResponse);
+      return true;
+      
+    case 'deleteChat':
+      handleDeleteChat(request.chatId, sendResponse);
+      return true;
+      
+    case 'exportChat':
+      handleExportChat(request.chatId, sendResponse);
       return true;
       
     default:
@@ -386,5 +424,108 @@ chrome.commands?.onCommand.addListener(async (command) => {
     chrome.tabs.create({ url: chrome.runtime.getURL('settings.html') });
   }
 });
+
+// Get current active tab
+async function handleGetCurrentTab(sendResponse) {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    sendResponse({ success: true, tab });
+  } catch (error) {
+    console.error('Error getting current tab:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Get chat history
+async function handleGetChatHistory(sendResponse) {
+  try {
+    console.log('Background: handleGetChatHistory called');
+    console.log('Background: ChatManager class available?', typeof ChatManager);
+    console.log('Background: Current chatManager instance?', !!chatManager);
+    
+    // Always ensure ChatManager is initialized
+    if (!chatManager) {
+      console.log('Background: Initializing ChatManager for getChatHistory');
+      if (typeof ChatManager === 'undefined') {
+        console.log('Background: ChatManager not found, attempting to reload scripts...');
+        try {
+          importScripts('js/chat-manager.js');
+          console.log('Background: Reloaded chat-manager.js, ChatManager available?', typeof ChatManager);
+        } catch (importError) {
+          console.error('Background: Failed to reload chat-manager.js:', importError);
+          throw new Error('ChatManager class not available - script import failed');
+        }
+      }
+      
+      if (typeof ChatManager === 'undefined') {
+        throw new Error('ChatManager class still not available after import attempt');
+      }
+      
+      chatManager = new ChatManager();
+      console.log('Background: ChatManager initialized successfully');
+    }
+    
+    const chatHistory = await chatManager.getChatHistory();
+    console.log('Background: Retrieved chat history:', chatHistory.length, 'chats');
+    sendResponse({ success: true, chatHistory });
+  } catch (error) {
+    console.error('Background: Error getting chat history:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Load specific chat
+async function handleLoadChat(chatId, sendResponse) {
+  try {
+    // Always ensure ChatManager is initialized
+    if (!chatManager) {
+      console.log('Background: Initializing ChatManager for loadChat');
+      chatManager = new ChatManager();
+    }
+    
+    const chat = await chatManager.loadChat(chatId);
+    console.log('Background: Loaded chat:', chatId, chat ? 'success' : 'not found');
+    sendResponse({ success: true, chat });
+  } catch (error) {
+    console.error('Background: Error loading chat:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Delete chat
+async function handleDeleteChat(chatId, sendResponse) {
+  try {
+    // Always ensure ChatManager is initialized
+    if (!chatManager) {
+      console.log('Background: Initializing ChatManager for deleteChat');
+      chatManager = new ChatManager();
+    }
+    
+    const result = await chatManager.deleteChat(chatId);
+    console.log('Background: Deleted chat:', chatId, result ? 'success' : 'failed');
+    sendResponse({ success: result });
+  } catch (error) {
+    console.error('Background: Error deleting chat:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Export chat as markdown
+async function handleExportChat(chatId, sendResponse) {
+  try {
+    // Always ensure ChatManager is initialized
+    if (!chatManager) {
+      console.log('Background: Initializing ChatManager for exportChat');
+      chatManager = new ChatManager();
+    }
+    
+    const markdown = await chatManager.exportChatAsMarkdown(chatId);
+    console.log('Background: Exported chat:', chatId, markdown ? 'success' : 'failed');
+    sendResponse({ success: true, markdown });
+  } catch (error) {
+    console.error('Background: Error exporting chat:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
 
 console.log('LlamB Background Script Loaded with LLM Integration');
