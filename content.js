@@ -85,22 +85,50 @@
       // Load PluginManager
       if (typeof PluginManager === 'undefined') {
         console.log('LlamB: Loading PluginManager script...');
-        const pluginScript = document.createElement('script');
-        pluginScript.src = chrome.runtime.getURL('js/plugin-manager.js');
-        document.head.appendChild(pluginScript);
-        await new Promise((resolve, reject) => {
-          pluginScript.onload = () => {
-            console.log('LlamB: PluginManager script loaded');
-            setTimeout(() => {
-              console.log('LlamB: PluginManager type after load:', typeof PluginManager);
-              resolve();
-            }, 50);
-          };
-          pluginScript.onerror = (error) => {
-            console.error('LlamB: Failed to load PluginManager script:', error);
-            reject(error);
-          };
-        });
+        const pluginManagerUrl = chrome.runtime.getURL('js/plugin-manager.js');
+        console.log('LlamB: PluginManager script URL:', pluginManagerUrl);
+        
+        try {
+          // Try fetch method first
+          const response = await fetch(pluginManagerUrl);
+          const scriptContent = await response.text();
+          console.log('LlamB: PluginManager script fetched, length:', scriptContent.length);
+          
+          // Execute the script content directly
+          eval(scriptContent);
+          console.log('LlamB: PluginManager script executed via eval');
+          
+          // Check if it worked
+          setTimeout(() => {
+            console.log('LlamB: PluginManager type after eval:', typeof PluginManager);
+            console.log('LlamB: window.PluginManager available?', typeof window.PluginManager);
+          }, 50);
+          
+        } catch (fetchError) {
+          console.error('LlamB: Fetch method failed, trying script tag:', fetchError);
+          
+          // Fallback to script tag method
+          const pluginScript = document.createElement('script');
+          pluginScript.src = pluginManagerUrl;
+          document.head.appendChild(pluginScript);
+          await new Promise((resolve, reject) => {
+            pluginScript.onload = () => {
+              console.log('LlamB: PluginManager script loaded via script tag');
+              setTimeout(() => {
+                console.log('LlamB: PluginManager type after script tag load:', typeof PluginManager);
+                console.log('LlamB: window.PluginManager available?', typeof window.PluginManager);
+                if (typeof window.PluginManager === 'undefined') {
+                  console.error('LlamB: PluginManager still not found on window object');
+                }
+                resolve();
+              }, 100);
+            };
+            pluginScript.onerror = (error) => {
+              console.error('LlamB: Failed to load PluginManager script:', error);
+              reject(error);
+            };
+          });
+        }
       }
       
       console.log('LlamB: Required scripts loaded');

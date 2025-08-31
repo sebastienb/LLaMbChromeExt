@@ -1,4 +1,6 @@
 // Plugin Manager - Core plugin system for LlamB extension
+console.log('PluginManager: Script execution started');
+
 class PluginManager {
   constructor() {
     this.plugins = new Map(); // Map of pluginId -> plugin instance
@@ -362,6 +364,8 @@ class PluginManager {
     return null;
   }
 }
+
+console.log('PluginManager: Class definition completed');
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
