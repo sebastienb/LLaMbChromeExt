@@ -347,11 +347,6 @@ class LlambPluginBase {
   }
 }
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = LlambPluginBase;
-} else {
-  // Make available globally for extension environment
-  window.LlambPluginBase = LlambPluginBase;
-  console.log('LlambPluginBase: Class assigned to window.LlambPluginBase');
-}
+// Export for use in content script
+console.log('LlambPluginBase: Making class available globally');
+window.LlambPluginBase = LlambPluginBase;

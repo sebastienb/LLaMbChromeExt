@@ -29,32 +29,6 @@
     timestamp: null
   };
 
-  // Load plugin classes inline to avoid context isolation
-  async function loadPluginClassesInline() {
-    try {
-      // Fetch and execute plugin-base.js in content script context
-      const pluginBaseResponse = await fetch(chrome.runtime.getURL('js/plugin-base.js'));
-      const pluginBaseCode = await pluginBaseResponse.text();
-      
-      // Create a new function to execute the code in our context
-      const pluginBaseFunction = new Function(pluginBaseCode);
-      pluginBaseFunction.call(window);
-      console.log('LlamB: LlambPluginBase loaded inline:', typeof LlambPluginBase);
-      
-      // Fetch and execute plugin-manager.js in content script context
-      const pluginManagerResponse = await fetch(chrome.runtime.getURL('js/plugin-manager.js'));
-      const pluginManagerCode = await pluginManagerResponse.text();
-      
-      // Create a new function to execute the code in our context
-      const pluginManagerFunction = new Function(pluginManagerCode);
-      pluginManagerFunction.call(window);
-      console.log('LlamB: PluginManager loaded inline:', typeof PluginManager);
-      
-    } catch (error) {
-      console.error('LlamB: Error loading plugin classes inline:', error);
-    }
-  }
-
   // Load required scripts
   async function loadRequiredScripts() {
     try {
@@ -91,9 +65,11 @@
         });
       }
       
-      // Load plugin classes inline to avoid context isolation issues
-      console.log('LlamB: Loading plugin classes inline...');
-      await loadPluginClassesInline();
+      // Plugin classes should be loaded by manifest.json content_scripts
+      console.log('LlamB: Checking for plugin classes loaded by manifest...');
+      console.log('LlamB: LlambPluginBase available:', typeof LlambPluginBase);
+      console.log('LlamB: PluginManager available:', typeof PluginManager);
+      console.log('LlamB: YoutubeCaptionsPlugin available:', typeof YoutubeCaptionsPlugin);
       
       console.log('LlamB: Required scripts loaded');
       console.log('LlamB: StorageManager available:', typeof StorageManager);
