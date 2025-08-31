@@ -94,10 +94,23 @@
             setTimeout(() => {
               console.log('LlamB: PluginManager type after load:', typeof PluginManager);
               console.log('LlamB: window.PluginManager available?', typeof window.PluginManager);
-              // Try to assign from window if it exists there
-              if (typeof PluginManager === 'undefined' && typeof window.PluginManager === 'function') {
-                window.PluginManager = window.PluginManager;
-                console.log('LlamB: Assigned PluginManager from window.PluginManager');
+              // Debug window object contents
+              console.log('LlamB: Checking window object for PluginManager...');
+              console.log('LlamB: window keys containing Plugin:', Object.keys(window).filter(k => k.includes('Plugin')));
+              console.log('LlamB: Direct window.PluginManager check:', window.PluginManager);
+              console.log('LlamB: window["PluginManager"] check:', window["PluginManager"]);
+              
+              // Try to access with different methods
+              console.log('LlamB: _llambPluginManagerLoaded?', window._llambPluginManagerLoaded);
+              console.log('LlamB: _llambPluginManagerClass?', typeof window._llambPluginManagerClass);
+              
+              if (window.PluginManager) {
+                console.log('LlamB: Found PluginManager on window object');
+              } else if (window._llambPluginManagerClass) {
+                console.log('LlamB: Found PluginManager via _llambPluginManagerClass');
+                window.PluginManager = window._llambPluginManagerClass;
+              } else {
+                console.error('LlamB: PluginManager NOT found on window object despite assignment message');
               }
               resolve();
             }, 100);

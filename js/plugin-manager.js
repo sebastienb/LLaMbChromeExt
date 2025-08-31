@@ -372,6 +372,21 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = PluginManager;
 } else {
   // Make available globally for extension environment
-  window.PluginManager = PluginManager;
-  console.log('PluginManager: Class assigned to window.PluginManager');
+  try {
+    window.PluginManager = PluginManager;
+    console.log('PluginManager: Class assigned to window.PluginManager');
+    console.log('PluginManager: Verification - window.PluginManager exists?', !!window.PluginManager);
+    console.log('PluginManager: Verification - window.PluginManager type:', typeof window.PluginManager);
+    
+    // Also try alternative assignment methods
+    self.PluginManager = PluginManager;
+    globalThis.PluginManager = PluginManager;
+    
+    // Store a reference that we can check later
+    window._llambPluginManagerLoaded = true;
+    window._llambPluginManagerClass = PluginManager;
+    
+  } catch (error) {
+    console.error('PluginManager: Error during assignment:', error);
+  }
 }
