@@ -18,7 +18,6 @@
       "js": [
         "js/plugin-base.js",
         "js/plugin-manager.js",
-        "plugins/youtube-captions/plugin.js",
         "content.js"
       ],
       "css": ["sidebar.css"],
