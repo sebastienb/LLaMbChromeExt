@@ -555,6 +555,34 @@ body.llamb-sidebar-closed {
   color: var(--llamb-selection-text);
 }
 
+.llamb-chip-plugin {
+  background: var(--llamb-chip-bg);
+  border: 1px solid var(--llamb-border);
+  color: var(--llamb-chip-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.llamb-chip-plugin:hover {
+  background: var(--llamb-user-bubble);
+  color: var(--llamb-user-text);
+  border-color: var(--llamb-user-bubble);
+}
+
+.llamb-chip-plugin.llamb-chip-active {
+  background: var(--llamb-user-bubble);
+  color: var(--llamb-user-text);
+  border-color: var(--llamb-user-bubble);
+}
+
+.llamb-chip-status {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
 .llamb-chip-close {
   margin-left: 4px;
   background: none;

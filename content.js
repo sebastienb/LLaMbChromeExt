@@ -18,6 +18,9 @@
   let storageManager = null;
   let currentChat = null;
   let tabId = null;
+  
+  // Plugin management
+  let pluginManager = null;
 
   // Cache for page content to avoid re-extraction
   let pageContentCache = {
@@ -59,9 +62,40 @@
         });
       }
       
+      // Load PluginBase
+      if (typeof LlambPluginBase === 'undefined') {
+        console.log('LlamB: Loading PluginBase script...');
+        const pluginBaseScript = document.createElement('script');
+        pluginBaseScript.src = chrome.runtime.getURL('js/plugin-base.js');
+        document.head.appendChild(pluginBaseScript);
+        await new Promise((resolve, reject) => {
+          pluginBaseScript.onload = resolve;
+          pluginBaseScript.onerror = reject;
+        });
+      }
+      
+      // Load PluginManager
+      if (typeof PluginManager === 'undefined') {
+        console.log('LlamB: Loading PluginManager script...');
+        const pluginScript = document.createElement('script');
+        pluginScript.src = chrome.runtime.getURL('js/plugin-manager.js');
+        document.head.appendChild(pluginScript);
+        await new Promise((resolve, reject) => {
+          pluginScript.onload = () => {
+            console.log('LlamB: PluginManager script loaded');
+            resolve();
+          };
+          pluginScript.onerror = (error) => {
+            console.error('LlamB: Failed to load PluginManager script:', error);
+            reject(error);
+          };
+        });
+      }
+      
       console.log('LlamB: Required scripts loaded');
       console.log('LlamB: StorageManager available:', typeof StorageManager);
       console.log('LlamB: ChatManager available:', typeof ChatManager);
+      console.log('LlamB: PluginManager available:', typeof PluginManager);
     } catch (error) {
       console.error('LlamB: Error loading scripts:', error);
     }
@@ -98,6 +132,26 @@
         }
       } else {
         console.warn('LlamB: ChatManager class not available');
+      }
+      
+      // Initialize PluginManager
+      if (typeof PluginManager !== 'undefined') {
+        try {
+          pluginManager = new PluginManager();
+          await pluginManager.initialize();
+          console.log('LlamB: PluginManager initialized successfully');
+          
+          // Enable YouTube captions plugin by default
+          await pluginManager.enablePlugin('youtube-captions');
+          
+          // Notify plugins of current page
+          await pluginManager.onPageChange();
+        } catch (error) {
+          console.error('LlamB: Error creating PluginManager:', error);
+          pluginManager = null;
+        }
+      } else {
+        console.warn('LlamB: PluginManager class not available');
       }
       
       if (typeof StorageManager !== 'undefined') {
@@ -1019,6 +1073,9 @@
     
     // Update suggested actions when context changes
     updateSuggestedActions();
+    
+    // Update plugin chips
+    updatePluginChips();
   }
 
   // Create selection chip element
@@ -1041,6 +1098,109 @@
     
     return chip;
   }
+
+  // Plugin context chip management
+  function updatePluginChips() {
+    if (!pluginManager) return;
+    
+    const chipsContainer = document.getElementById('llamb-context-chips');
+    if (!chipsContainer) return;
+    
+    // Remove existing plugin chips
+    const existingPluginChips = chipsContainer.querySelectorAll('.llamb-chip-plugin');
+    existingPluginChips.forEach(chip => chip.remove());
+    
+    // Add chips for active plugins
+    const enabledPlugins = pluginManager.getEnabledPlugins();
+    enabledPlugins.forEach(pluginManifest => {
+      if (pluginManager.shouldPluginRun(pluginManifest.id)) {
+        const plugin = pluginManager.plugins.get(pluginManifest.id);
+        if (plugin && plugin.contextChip) {
+          const pluginChip = createPluginChip(plugin.contextChip);
+          chipsContainer.appendChild(pluginChip);
+        }
+      }
+    });
+  }
+
+  // Create plugin chip element
+  function createPluginChip(chipData) {
+    const chip = document.createElement('div');
+    chip.className = 'llamb-chip llamb-chip-plugin';
+    chip.dataset.pluginId = chipData.pluginId;
+    chip.innerHTML = `
+      <span class="llamb-chip-icon">${chipData.icon}</span>
+      <span class="llamb-chip-text">${chipData.text}</span>
+      ${chipData.status === 'loading' ? '<span class="llamb-chip-status">⏳</span>' : ''}
+      ${chipData.status === 'ready' ? '<span class="llamb-chip-status">✓</span>' : ''}
+    `;
+    
+    // Add click handler to toggle chip
+    chip.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      togglePluginChip(chipData.pluginId);
+    });
+    
+    // Add hover tooltip
+    if (chipData.description) {
+      chip.title = chipData.description;
+    }
+    
+    return chip;
+  }
+
+  // Toggle plugin chip active state
+  function togglePluginChip(pluginId) {
+    const chip = document.querySelector(`.llamb-chip-plugin[data-plugin-id="${pluginId}"]`);
+    if (!chip) return;
+    
+    const isActive = chip.classList.contains('llamb-chip-active');
+    
+    if (isActive) {
+      chip.classList.remove('llamb-chip-active');
+    } else {
+      // Deactivate other plugin chips if needed
+      const otherPluginChips = document.querySelectorAll('.llamb-chip-plugin.llamb-chip-active');
+      otherPluginChips.forEach(otherChip => {
+        if (otherChip.dataset.pluginId !== pluginId) {
+          otherChip.classList.remove('llamb-chip-active');
+        }
+      });
+      
+      chip.classList.add('llamb-chip-active');
+    }
+    
+    // Update plugin chip state
+    if (pluginManager) {
+      const plugin = pluginManager.plugins.get(pluginId);
+      if (plugin && plugin.contextChip) {
+        plugin.contextChip.isActive = !isActive;
+      }
+    }
+  }
+
+  // Add plugin context chip (called by plugins)
+  window.addPluginContextChip = function(pluginId, chipData) {
+    if (!pluginManager) return;
+    
+    const plugin = pluginManager.plugins.get(pluginId);
+    if (!plugin) return;
+    
+    plugin.contextChip = chipData;
+    updatePluginChips();
+  };
+
+  // Remove plugin context chip (called by plugins)
+  window.removePluginContextChip = function(pluginId) {
+    if (!pluginManager) return;
+    
+    const plugin = pluginManager.plugins.get(pluginId);
+    if (!plugin) return;
+    
+    plugin.contextChip = null;
+    updatePluginChips();
+  };
 
   // Create sidebar container
   function createSidebar() {
@@ -1382,7 +1542,7 @@
     sendBtn.disabled = true;
 
     // Get page context
-    const pageContext = getPageContext();
+    const pageContext = await getPageContext();
 
     // Create new chat if none exists
     if (!currentChat) {
@@ -1453,7 +1613,7 @@
       console.log('LlamB: Sending message:', message);
       
       // Get page context
-      const pageContext = getPageContext();
+      const pageContext = await getPageContext();
       console.log('LlamB: Page context:', pageContext);
       
       // Send to background script for LLM processing
@@ -1677,17 +1837,41 @@
   }
 
   // Get page context
-  function getPageContext() {
+  async function getPageContext() {
     // Combine all preserved selections
     const allSelections = preservedSelections.map(sel => sel.text).join('\n\n---\n\n');
     
-    return {
+    const context = {
       url: window.location.href,
       title: document.title,
       selectedText: allSelections || getSelectedText(),
       markdownContent: extractPageContent(),
       timestamp: new Date().toISOString()
     };
+    
+    // Add plugin content if any plugin chips are active
+    if (pluginManager) {
+      const activePluginChips = document.querySelectorAll('.llamb-chip-plugin.llamb-chip-active');
+      let pluginContent = '';
+      
+      for (const chip of activePluginChips) {
+        const pluginId = chip.dataset.pluginId;
+        try {
+          const content = await pluginManager.getPluginContent(pluginId);
+          if (content) {
+            pluginContent += (pluginContent ? '\n\n---\n\n' : '') + content;
+          }
+        } catch (error) {
+          console.error(`LlamB: Error getting content from plugin ${pluginId}:`, error);
+        }
+      }
+      
+      if (pluginContent) {
+        context.pluginContent = pluginContent;
+      }
+    }
+    
+    return context;
   }
 
   // Handle page layout changes for fixed/absolute positioned elements
@@ -1732,7 +1916,7 @@
   });
 
   // Listen for messages from background script
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     try {
       console.log('LlamB: Received message:', request);
       
@@ -1741,7 +1925,7 @@
         setTimeout(() => handlePageLayoutChange(), 100);
         sendResponse({ success: true });
       } else if (request.action === 'getPageContext') {
-        const context = getPageContext();
+        const context = await getPageContext();
         console.log('LlamB: Sending context:', context);
         sendResponse(context);
       } else if (request.action === 'addMessage') {

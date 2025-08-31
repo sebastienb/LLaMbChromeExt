@@ -47,6 +47,10 @@
         "js/llm-manager.js",
         "js/llm-providers.js",
         "js/stream-parser.js",
+        "js/plugin-manager.js",
+        "js/plugin-base.js",
+        "plugins/youtube-captions/plugin.js",
+        "plugins/youtube-captions/manifest.json",
         "icons/icon128.png"
       ],
       "matches": ["<all_urls>"]
