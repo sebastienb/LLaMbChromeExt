@@ -52,8 +52,11 @@
         await new Promise((resolve, reject) => {
           chatScript.onload = () => {
             console.log('LlamB: ChatManager script loaded, checking availability...');
-            console.log('LlamB: ChatManager type after load:', typeof ChatManager);
-            resolve();
+            // Give the script time to execute
+            setTimeout(() => {
+              console.log('LlamB: ChatManager type after load:', typeof ChatManager);
+              resolve();
+            }, 100);
           };
           chatScript.onerror = (error) => {
             console.error('LlamB: Failed to load ChatManager script:', error);
@@ -69,7 +72,12 @@
         pluginBaseScript.src = chrome.runtime.getURL('js/plugin-base.js');
         document.head.appendChild(pluginBaseScript);
         await new Promise((resolve, reject) => {
-          pluginBaseScript.onload = resolve;
+          pluginBaseScript.onload = () => {
+            setTimeout(() => {
+              console.log('LlamB: LlambPluginBase type after load:', typeof LlambPluginBase);
+              resolve();
+            }, 50);
+          };
           pluginBaseScript.onerror = reject;
         });
       }
@@ -83,7 +91,10 @@
         await new Promise((resolve, reject) => {
           pluginScript.onload = () => {
             console.log('LlamB: PluginManager script loaded');
-            resolve();
+            setTimeout(() => {
+              console.log('LlamB: PluginManager type after load:', typeof PluginManager);
+              resolve();
+            }, 50);
           };
           pluginScript.onerror = (error) => {
             console.error('LlamB: Failed to load PluginManager script:', error);
@@ -96,6 +107,13 @@
       console.log('LlamB: StorageManager available:', typeof StorageManager);
       console.log('LlamB: ChatManager available:', typeof ChatManager);
       console.log('LlamB: PluginManager available:', typeof PluginManager);
+      console.log('LlamB: LlambPluginBase available:', typeof LlambPluginBase);
+      
+      // List all available classes on window
+      const classes = Object.keys(window).filter(key => 
+        key.endsWith('Manager') || key.includes('Plugin') || key.includes('Chat')
+      );
+      console.log('LlamB: All Manager/Plugin classes on window:', classes);
     } catch (error) {
       console.error('LlamB: Error loading scripts:', error);
     }

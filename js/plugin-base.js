@@ -352,13 +352,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = LlambPluginBase;
 } else {
   // Make available globally for extension environment
-  if (typeof globalThis !== 'undefined') {
-    globalThis.LlambPluginBase = LlambPluginBase;
-  }
-  if (typeof self !== 'undefined') {
-    self.LlambPluginBase = LlambPluginBase;
-  }
-  if (typeof window !== 'undefined') {
-    window.LlambPluginBase = LlambPluginBase;
-  }
+  window.LlambPluginBase = LlambPluginBase;
+  console.log('LlambPluginBase: Class assigned to window.LlambPluginBase');
 }

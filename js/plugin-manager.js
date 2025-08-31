@@ -368,13 +368,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = PluginManager;
 } else {
   // Make available globally for extension environment
-  if (typeof globalThis !== 'undefined') {
-    globalThis.PluginManager = PluginManager;
-  }
-  if (typeof self !== 'undefined') {
-    self.PluginManager = PluginManager;
-  }
-  if (typeof window !== 'undefined') {
-    window.PluginManager = PluginManager;
-  }
+  window.PluginManager = PluginManager;
+  console.log('PluginManager: Class assigned to window.PluginManager');
 }

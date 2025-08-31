@@ -310,15 +310,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = ChatManager;
 } else {
   // For browser/extension environment, ensure ChatManager is globally available
-  if (typeof globalThis !== 'undefined') {
-    globalThis.ChatManager = ChatManager;
-  }
-  if (typeof self !== 'undefined') {
-    self.ChatManager = ChatManager;
-  }
-  if (typeof window !== 'undefined') {
-    window.ChatManager = ChatManager;
-  }
-  // For service workers, try to assign to the global scope directly
-  this.ChatManager = ChatManager;
+  window.ChatManager = ChatManager;
+  console.log('ChatManager: Class assigned to window.ChatManager');
 }
