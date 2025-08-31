@@ -303,10 +303,13 @@ class PluginManager {
 
   // Notify plugins of page changes
   async onPageChange() {
+    console.log('PluginManager: onPageChange called for', this.plugins.size, 'plugins');
     for (const [pluginId, plugin] of this.plugins) {
+      console.log(`PluginManager: Checking plugin ${pluginId}, shouldRun:`, this.shouldPluginRun(pluginId));
       if (this.shouldPluginRun(pluginId)) {
         try {
           if (typeof plugin.onPageChange === 'function') {
+            console.log(`PluginManager: Calling onPageChange for ${pluginId}`);
             await plugin.onPageChange();
           }
         } catch (error) {

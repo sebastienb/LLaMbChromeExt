@@ -13,7 +13,12 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
    * Check if this plugin should run on the current page
    */
   shouldRunOnCurrentPage() {
-    return this.isOnDomain('youtube.com') && this.isVideoPage();
+    const isYouTube = this.isOnDomain(['youtube.com', 'www.youtube.com']) || 
+                     window.location.hostname.includes('youtube.com');
+    const isVideo = this.isVideoPage();
+    
+    this.log('Domain check:', window.location.hostname, 'isYouTube:', isYouTube, 'isVideo:', isVideo);
+    return isYouTube && isVideo;
   }
 
   /**
@@ -52,15 +57,21 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
    * Called when page changes - check for new video
    */
   async onPageChange() {
+    this.log('Page change detected:', window.location.href);
     await super.onPageChange();
     
     if (this.shouldRunOnCurrentPage()) {
       const videoId = this.getCurrentVideoId();
+      this.log('Current video ID:', videoId, 'Previous:', this.currentVideoId);
+      
       if (videoId !== this.currentVideoId) {
         this.currentVideoId = videoId;
         this.captionsCache = null;
+        this.log('New video detected, extracting captions...');
         await this.extractCaptions();
       }
+    } else {
+      this.log('Plugin should not run on current page');
     }
   }
 
@@ -352,6 +363,7 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
    * Handle plugin activation
    */
   onActivate() {
+    this.log('Plugin activated');
     super.onActivate();
     
     // Set up observer for YouTube navigation (SPA routing)
@@ -359,7 +371,14 @@ class YoutubeCaptionsPlugin extends LlambPluginBase {
     
     // Extract captions for current video if on video page
     if (this.shouldRunOnCurrentPage()) {
+      this.log('Plugin should run on current page, extracting captions...');
       this.extractCaptions();
+    } else {
+      this.log('Plugin should NOT run on current page');
+      this.log('Current URL:', window.location.href);
+      this.log('Current hostname:', window.location.hostname);
+      this.log('Current pathname:', window.location.pathname);
+      this.log('Current search:', window.location.search);
     }
   }
 

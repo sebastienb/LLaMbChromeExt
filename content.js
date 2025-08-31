@@ -142,9 +142,12 @@
           console.log('LlamB: PluginManager initialized successfully');
           
           // Enable YouTube captions plugin by default
-          await pluginManager.enablePlugin('youtube-captions');
+          console.log('LlamB: Enabling YouTube captions plugin...');
+          const enabled = await pluginManager.enablePlugin('youtube-captions');
+          console.log('LlamB: YouTube captions plugin enabled:', enabled);
           
           // Notify plugins of current page
+          console.log('LlamB: Notifying plugins of page change...');
           await pluginManager.onPageChange();
         } catch (error) {
           console.error('LlamB: Error creating PluginManager:', error);
