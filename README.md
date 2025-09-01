@@ -43,17 +43,7 @@ The extension features a modular plugin architecture that allows for site-specif
 2. **Open Chrome** and navigate to `chrome://extensions/`
 3. **Enable Developer Mode** by toggling the switch in the top right corner
 4. **Click "Load unpacked"** and select the project folder (`LlambBrowserExt`)
-5. **Add Icons**: Create and add icon files to the `icons/` folder:
-   - `icon16.png` (16x16 pixels)
-   - `icon48.png` (48x48 pixels) 
-   - `icon128.png` (128x128 pixels)
 
-### Create Icons
-
-You can use the included `create_icons.html` file to generate icons:
-1. Open `create_icons.html` in your browser
-2. Download the generated PNG files
-3. Place them in the `icons/` folder
 
 ## Usage
 
