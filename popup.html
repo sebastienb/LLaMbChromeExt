@@ -6,11 +6,13 @@
     <style>
         body {
             min-width: 320px;
-            max-width: 480px;
             width: 100%;
+            height: 100vh;
             padding: 0;
-            margin: 0 auto;
+            margin: 0;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
         }
         
         .popup-header {
@@ -40,57 +42,565 @@
         .footer-links a:hover {
             color: var(--llamb-text-primary);
         }
+
+        .popup-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+        }
+
+        .llamb-content {
+            flex: 1;
+            width: 100%;
+            overflow-y: auto;
+            padding: var(--llamb-spacing-lg);
+            box-sizing: border-box;
+        }
+
+        .tab-content {
+            height: 100%;
+        }
+
+        .llamb-connections-list, .llamb-actions-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+
+        .llamb-empty-state {
+            text-align: center;
+            padding: var(--llamb-spacing-xl);
+            color: var(--llamb-text-secondary);
+        }
+
+        .llamb-empty-icon {
+            font-size: 2rem;
+            margin-bottom: var(--llamb-spacing-md);
+        }
+
+        .llamb-empty-title {
+            font-weight: var(--llamb-font-weight-semibold);
+            margin-bottom: var(--llamb-spacing-xs);
+        }
+
+        .llamb-header-buttons {
+            display: flex;
+            gap: var(--llamb-spacing-xs);
+        }
+
+        /* Unified Card Component System */
+        .llamb-card {
+            background: var(--llamb-bg-secondary);
+            border: 1px solid var(--llamb-border);
+            border-radius: var(--llamb-radius-md);
+            padding: var(--llamb-spacing-md);
+            margin-bottom: var(--llamb-spacing-sm);
+            transition: all var(--llamb-transition-fast);
+        }
+
+        .llamb-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .llamb-card.active {
+            border-color: var(--llamb-user-bubble);
+            background: var(--llamb-bg-primary);
+        }
+
+        .llamb-card.disabled {
+            opacity: 0.6;
+            background: var(--llamb-bg-tertiary);
+        }
+
+        .llamb-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--llamb-spacing-sm);
+        }
+
+        .llamb-card-main {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--llamb-spacing-sm);
+            flex: 1;
+        }
+
+        .llamb-card-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            opacity: 0.7;
+        }
+
+        .llamb-card-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .llamb-card-title {
+            font-weight: var(--llamb-font-weight-semibold);
+            margin-bottom: var(--llamb-spacing-xs);
+            color: var(--llamb-text-primary);
+        }
+
+        .llamb-card-subtitle {
+            font-size: var(--llamb-font-size-sm);
+            color: var(--llamb-text-secondary);
+            margin-bottom: var(--llamb-spacing-xs);
+        }
+
+        .llamb-card-meta {
+            font-size: var(--llamb-font-size-xs);
+            color: var(--llamb-text-tertiary);
+        }
+
+        .llamb-card-badge {
+            display: flex;
+            align-items: center;
+            gap: var(--llamb-spacing-xs);
+            font-size: var(--llamb-font-size-xs);
+            color: var(--llamb-text-secondary);
+        }
+
+        .llamb-card-actions {
+            display: flex;
+            gap: var(--llamb-spacing-xs);
+            margin-top: var(--llamb-spacing-sm);
+        }
+
+        /* Status dot styling */
+        .llamb-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .llamb-status-dot.enabled {
+            background: #10b981;
+        }
+
+        .llamb-status-dot.disabled {
+            background: #ef4444;
+        }
+
+        /* Icon styling */
+        .llamb-icon {
+            width: 16px;
+            height: 16px;
+            opacity: 0.7;
+            transition: all var(--llamb-transition-fast);
+        }
+
+        .llamb-btn .llamb-icon {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Icon hover effects */
+        .llamb-card:hover .llamb-card-icon,
+        .llamb-btn:hover .llamb-icon,
+        .llamb-card:hover .llamb-icon {
+            opacity: 1;
+            filter: invert(0.2);
+        }
+
+        .llamb-plugin-list {
+            display: flex;
+            flex-direction: column;
+            gap: var(--llamb-spacing-sm);
+            margin-bottom: var(--llamb-spacing-md);
+        }
+
+        .plugin-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--llamb-spacing-sm) var(--llamb-spacing-md);
+            background: var(--llamb-bg-secondary);
+            border-radius: var(--llamb-radius-md);
+            border: 1px solid var(--llamb-border);
+        }
+
+        .plugin-info {
+            display: flex;
+            align-items: center;
+            gap: var(--llamb-spacing-sm);
+            flex: 1;
+        }
+
+        .plugin-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .plugin-details {
+            flex: 1;
+        }
+
+        .plugin-name {
+            font-weight: var(--llamb-font-weight-medium);
+            font-size: var(--llamb-font-size-sm);
+            color: var(--llamb-text-primary);
+            margin: 0;
+        }
+
+        .plugin-status {
+            font-size: var(--llamb-font-size-xs);
+            color: var(--llamb-text-secondary);
+            margin: 2px 0 0 0;
+        }
+
+        .plugin-toggle-popup {
+            position: relative;
+            display: inline-block;
+            width: 32px;
+            height: 18px;
+        }
+
+        .plugin-toggle-popup input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider-popup {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .3s;
+            border-radius: 18px;
+        }
+
+        .toggle-slider-popup:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider-popup {
+            background-color: var(--llamb-user-bubble);
+        }
+
+        input:checked + .toggle-slider-popup:before {
+            transform: translateX(14px);
+        }
+
+        .plugin-item.disabled {
+            opacity: 0.6;
+        }
+
+        .plugins-empty {
+            text-align: center;
+            padding: var(--llamb-spacing-lg);
+            color: var(--llamb-text-secondary);
+            font-size: var(--llamb-font-size-sm);
+        }
+
+        .plugins-empty .icon {
+            font-size: 24px;
+            margin-bottom: var(--llamb-spacing-sm);
+        }
+
+        /* Modal fixes */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none; /* Hide by default */
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Tab system */
+        .popup-tabs {
+            display: flex;
+            background: var(--llamb-bg-tertiary);
+            border-radius: var(--llamb-radius-lg) var(--llamb-radius-lg) 0 0;
+            margin: 0 var(--llamb-spacing-xl);
+            border-bottom: 1px solid var(--llamb-border);
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: var(--llamb-spacing-md) var(--llamb-spacing-lg);
+            border: none;
+            background: transparent;
+            color: var(--llamb-text-secondary);
+            font-size: var(--llamb-font-size-sm);
+            font-weight: var(--llamb-font-weight-medium);
+            cursor: pointer;
+            transition: all var(--llamb-transition-fast);
+            border-radius: var(--llamb-radius-md) var(--llamb-radius-md) 0 0;
+            position: relative;
+        }
+
+        .tab-button:hover {
+            color: var(--llamb-text-primary);
+            background: var(--llamb-bg-secondary);
+        }
+
+        .tab-button.active {
+            color: var(--llamb-text-primary);
+            background: var(--llamb-bg-primary);
+            border-bottom: 2px solid var(--llamb-user-bubble);
+        }
+
+        .tab-content {
+            display: none;
+            padding: var(--llamb-spacing-xl);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Enhanced visual design */
+        body {
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .popup-header {
+            flex-shrink: 0;
+        }
+
+        .popup-tabs {
+            flex-shrink: 0;
+        }
+
+        .llamb-content {
+            padding: 0;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tab-content {
+            min-height: 100%;
+        }
+
+        .popup-footer {
+            flex-shrink: 0;
+        }
+
+        /* Ensure proper flex layout */
+        .llamb-root {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Better plugin item styling */
+        .plugin-item {
+            transition: all var(--llamb-transition-fast);
+            border: 2px solid transparent;
+        }
+
+        .plugin-item:hover {
+            border-color: var(--llamb-border);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .plugin-item.disabled {
+            opacity: 0.5;
+            background: var(--llamb-bg-tertiary);
+        }
+
+        /* Status indicator improvements */
+        .llamb-status {
+            display: flex;
+            align-items: center;
+            gap: var(--llamb-spacing-sm);
+            padding: var(--llamb-spacing-sm) var(--llamb-spacing-md);
+            background: var(--llamb-bg-tertiary);
+            border-radius: var(--llamb-radius-md);
+            font-size: var(--llamb-font-size-sm);
+            margin-bottom: var(--llamb-spacing-md);
+        }
+
+        .llamb-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ccc;
+            flex-shrink: 0;
+        }
+
+        .llamb-status-dot.connected {
+            background: #4caf50;
+            box-shadow: 0 0 6px rgba(76, 175, 80, 0.3);
+        }
+
+        .llamb-status-dot.disconnected {
+            background: #f44336;
+            box-shadow: 0 0 6px rgba(244, 67, 54, 0.3);
+        }
+
+        .llamb-status-dot.loading {
+            background: #ff9800;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Better section spacing */
+        .llamb-section {
+            margin-bottom: var(--llamb-spacing-xl);
+        }
+
+        .llamb-section:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Improved form groups */
+        .llamb-form-group {
+            margin-bottom: var(--llamb-spacing-lg);
+        }
+
+        /* Better button styles */
+        .llamb-btn {
+            transition: all var(--llamb-transition-fast);
+        }
+
+        .llamb-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .llamb-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Loading animation for plugin icons */
+        .plugin-icon.loading {
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="llamb-root">
-    <div class="llamb-header popup-header">
-        <div class="llamb-header-title">
-            <span>🦙</span>
-            <div>
-                <div>LlamB Assistant</div>
-                <div class="llamb-text-secondary llamb-text-sm">AI Chat with webpage context</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="llamb-content">
-        <div class="llamb-section">
-            <div class="llamb-section-header">
-                <div class="llamb-section-title">Quick Actions</div>
-                <button class="llamb-btn llamb-btn-sm" id="customize-actions-btn" title="Customize Actions">
-                    ⚙️
-                </button>
-            </div>
-            <div class="llamb-button-group">
-                <button class="llamb-btn llamb-btn-primary llamb-btn-full" id="toggle-sidebar">
-                    💬 Toggle Chat Sidebar
-                </button>
-                <div class="llamb-quick-actions" id="quick-actions-container">
-                    <!-- Dynamic quick actions will be loaded here -->
+    <div class="popup-container">
+        <div class="llamb-header popup-header">
+            <div class="llamb-header-title">
+                <span>🦙</span>
+                <div>
+                    <div>LlamB Assistant</div>
+                    <div class="llamb-text-secondary llamb-text-sm">AI Chat with webpage context</div>
                 </div>
             </div>
         </div>
 
-        <div class="llamb-section">
-            <div class="llamb-section-title">Settings</div>
-            
-            <div class="llamb-form-group">
-                <label class="llamb-label" for="connection-select">Active Connection</label>
-                <select class="llamb-input llamb-select" id="connection-select">
-                    <option value="">No connections configured</option>
-                </select>
-            </div>
+        <!-- Tab Navigation -->
+        <div class="popup-tabs">
+            <button class="tab-button active" data-tab="actions">
+                ⚡ Actions
+            </button>
+            <button class="tab-button" data-tab="connections">
+                🔗 Connections
+            </button>
+            <button class="tab-button" data-tab="plugins">
+                🧩 Plugins
+            </button>
+        </div>
 
-            <div class="llamb-form-group">
-                <button class="llamb-btn llamb-btn-full" id="manage-connections-btn">
-                    ⚙️ Manage Connections
-                </button>
+        <div class="llamb-content">
+        <!-- Actions Tab -->
+        <div class="tab-content active" id="actions-tab">
+            <div class="llamb-section">
+                <div class="llamb-section-header">
+                    <div class="llamb-section-title">Quick Actions</div>
+                    <div class="llamb-header-buttons">
+                        <button class="llamb-btn llamb-btn-sm" id="restore-defaults-btn" title="Restore Default Actions">
+                            🔄
+                        </button>
+                        <button class="llamb-btn llamb-btn-sm" id="add-action-btn" title="Add New Action">
+                            ➕
+                        </button>
+                    </div>
+                </div>
+                <div class="llamb-actions-list" id="actions-list">
+                    <!-- Editable actions list will be loaded here -->
+                </div>
             </div>
+        </div>
 
-            <div class="llamb-status" id="connection-status">
-                <div class="llamb-status-dot"></div>
-                <span>Loading...</span>
+        <!-- Connections Tab -->
+        <div class="tab-content" id="connections-tab">
+            <div class="llamb-section">
+                <div class="llamb-section-header">
+                    <div class="llamb-section-title">Connections</div>
+                    <button class="llamb-btn llamb-btn-sm" id="add-connection-btn" title="Add New Connection">
+                        ➕
+                    </button>
+                </div>
+                
+                <div class="llamb-connections-list" id="connections-list">
+                    <!-- Connections will be loaded here -->
+                </div>
+                
+                <div class="llamb-empty-state" id="connections-empty-state" style="display: none;">
+                    <div class="llamb-empty-icon">🔗</div>
+                    <div class="llamb-empty-title">No connections configured</div>
+                    <div class="llamb-empty-subtitle">Add your first LLM connection to get started</div>
+                </div>
             </div>
+        </div>
+
+        <!-- Plugins Tab -->
+        <div class="tab-content" id="plugins-tab">
+            <div class="llamb-section">
+                <div class="llamb-section-title">Plugin Management</div>
+                
+                <div id="plugins-list" class="llamb-plugin-list">
+                    <!-- Plugins will be loaded here -->
+                </div>
+
+                <div class="llamb-form-group">
+                    <button class="llamb-btn llamb-btn-full" id="manage-plugins-btn">
+                        ⚙️ Manage All Plugins
+                    </button>
+                </div>
+            </div>
+        </div>
         </div>
     </div>
 
@@ -102,24 +612,6 @@
         </div>
     </div>
 
-    <!-- Quick Actions Manager Modal -->
-    <div class="modal-overlay" id="actions-modal">
-        <div class="modal llamb-modal">
-            <div class="modal-header">
-                <h3 class="modal-title">Customize Quick Actions</h3>
-                <button class="modal-close" id="close-actions-modal">×</button>
-            </div>
-            <div class="modal-content">
-                <div class="llamb-actions-list" id="actions-list">
-                    <!-- Actions list will be populated here -->
-                </div>
-                <div class="llamb-actions-toolbar">
-                    <button class="llamb-btn" id="add-action-btn">➕ Add New Action</button>
-                    <button class="llamb-btn" id="restore-defaults-btn">🔄 Restore Defaults</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Action Editor Modal -->
     <div class="modal-overlay" id="action-editor-modal">
@@ -184,6 +676,7 @@
         </div>
     </div>
 
+    <script src="js/storage-manager.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

@@ -10,6 +10,7 @@ class SettingsManager {
     await this.loadSettings();
     this.setupEventListeners();
     this.loadConnections();
+    this.loadPlugins();
   }
 
   // Load global settings
@@ -297,6 +298,7 @@ class SettingsManager {
         customHeaders = JSON.parse(headersText);
       }
     } catch (error) {
+      console.error('Custom headers JSON error:', error);
       throw new Error('Invalid JSON in custom headers');
     }
 
@@ -305,8 +307,26 @@ class SettingsManager {
     const modelInput = document.getElementById('connection-model-input').value.trim();
     const model = modelSelect || modelInput;
     
+    console.log('Form validation debug:', {
+      modelSelect,
+      modelInput,
+      finalModel: model,
+      name: document.getElementById('connection-name').value.trim(),
+      endpoint: document.getElementById('connection-endpoint').value.trim()
+    });
+    
     if (!model) {
-      throw new Error('Model is required');
+      throw new Error('Please select a model from the dropdown or enter a custom model name');
+    }
+
+    const name = document.getElementById('connection-name').value.trim();
+    if (!name) {
+      throw new Error('Connection name is required');
+    }
+
+    const endpoint = document.getElementById('connection-endpoint').value.trim();
+    if (!endpoint) {
+      throw new Error('Endpoint URL is required');
     }
 
     return {
@@ -590,6 +610,199 @@ class SettingsManager {
       await this.loadConnections();
     } catch (error) {
       this.showToast('Import failed: ' + error.message, 'error');
+    }
+  }
+
+  // Load and display plugins
+  async loadPlugins() {
+    try {
+      const pluginSettings = await this.getPluginSettings();
+      const pluginsContainer = document.getElementById('plugins-container');
+      const emptyState = document.getElementById('plugins-empty-state');
+      const pluginsList = document.getElementById('plugins-list');
+
+      // Get available plugins from PluginManager if accessible
+      const availablePlugins = await this.getAvailablePlugins();
+      
+      if (!availablePlugins || availablePlugins.length === 0) {
+        emptyState.style.display = 'block';
+        pluginsList.innerHTML = '';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      pluginsList.innerHTML = '';
+
+      const pluginsListContainer = document.createElement('div');
+      pluginsListContainer.className = 'plugin-list';
+
+      for (const plugin of availablePlugins) {
+        const isEnabled = pluginSettings.enabled.includes(plugin.id);
+        const card = this.createPluginCard(plugin, isEnabled);
+        pluginsListContainer.appendChild(card);
+      }
+
+      pluginsList.appendChild(pluginsListContainer);
+    } catch (error) {
+      console.error('Failed to load plugins:', error);
+      this.showToast('Failed to load plugins', 'error');
+    }
+  }
+
+  // Get plugin settings from storage
+  async getPluginSettings() {
+    try {
+      const result = await chrome.storage.local.get('llamb-plugin-settings');
+      const settings = result['llamb-plugin-settings'] || {};
+      return {
+        enabled: settings.enabled || [],
+        plugins: settings.plugins || {}
+      };
+    } catch (error) {
+      console.error('Error loading plugin settings:', error);
+      return { enabled: [], plugins: {} };
+    }
+  }
+
+  // Get available plugins from background script or content script
+  async getAvailablePlugins() {
+    try {
+      // Try to get plugins from background script first
+      return new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          action: 'getAvailablePlugins'
+        }, (response) => {
+          if (response && response.plugins) {
+            resolve(response.plugins);
+          } else {
+            // Fallback: return hardcoded plugin info if background script doesn't respond
+            resolve([
+              {
+                id: 'youtube-captions',
+                name: 'YouTube Captions',
+                description: 'Extract captions from YouTube videos',
+                version: '1.0.0',
+                icon: '💬',
+                matches: ['*://www.youtube.com/watch*', '*://youtube.com/watch*'],
+                permissions: ['extractContent']
+              }
+            ]);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Error getting available plugins:', error);
+      return [];
+    }
+  }
+
+  // Create plugin card HTML
+  createPluginCard(plugin, isEnabled) {
+    const card = document.createElement('div');
+    card.className = `plugin-card ${isEnabled ? '' : 'disabled'}`;
+    card.dataset.pluginId = plugin.id;
+
+    const matches = plugin.matches || [];
+    const matchesHtml = matches.length > 0 ? `
+      <div class="plugin-matches">
+        <strong>Active on:</strong>
+        <ul>
+          ${matches.map(match => `<li>${match}</li>`).join('')}
+        </ul>
+      </div>
+    ` : '';
+
+    card.innerHTML = `
+      <div class="plugin-header">
+        <div class="plugin-info">
+          <h3 class="plugin-name">
+            <span class="plugin-icon">${plugin.icon || '🧩'}</span>
+            ${plugin.name}
+          </h3>
+          <p class="plugin-description">${plugin.description}</p>
+        </div>
+        <div class="plugin-toggle">
+          <label class="toggle-switch">
+            <input type="checkbox" ${isEnabled ? 'checked' : ''} data-plugin-id="${plugin.id}">
+            <span class="toggle-slider round"></span>
+          </label>
+        </div>
+      </div>
+      
+      <div class="plugin-details">
+        <strong>Version:</strong> <span>${plugin.version || '1.0.0'}</span>
+        <strong>Status:</strong> <span>${isEnabled ? 'Enabled' : 'Disabled'}</span>
+      </div>
+      
+      ${matchesHtml}
+    `;
+
+    // Add event listener for the toggle
+    const toggleInput = card.querySelector('input[type="checkbox"]');
+    toggleInput.addEventListener('change', (e) => this.handlePluginToggle(e));
+
+    return card;
+  }
+
+  // Handle plugin toggle
+  async handlePluginToggle(event) {
+    const pluginId = event.target.dataset.pluginId;
+    const isEnabled = event.target.checked;
+    
+    try {
+      // Update plugin settings in storage
+      await this.updatePluginEnabled(pluginId, isEnabled);
+      
+      // Send message to background script to enable/disable plugin
+      chrome.runtime.sendMessage({
+        action: isEnabled ? 'enablePlugin' : 'disablePlugin',
+        pluginId: pluginId
+      }, (response) => {
+        if (response && response.success) {
+          this.showToast(`Plugin ${isEnabled ? 'enabled' : 'disabled'}`, 'success');
+          
+          // Update card visual state
+          const card = document.querySelector(`[data-plugin-id="${pluginId}"]`);
+          if (card) {
+            card.className = `plugin-card ${isEnabled ? '' : 'disabled'}`;
+            const statusSpan = card.querySelector('.plugin-details span:last-child');
+            if (statusSpan) {
+              statusSpan.textContent = isEnabled ? 'Enabled' : 'Disabled';
+            }
+          }
+        } else {
+          this.showToast(`Failed to ${isEnabled ? 'enable' : 'disable'} plugin`, 'error');
+          // Revert the toggle
+          event.target.checked = !isEnabled;
+        }
+      });
+    } catch (error) {
+      console.error('Error toggling plugin:', error);
+      this.showToast('Failed to update plugin settings', 'error');
+      // Revert the toggle
+      event.target.checked = !isEnabled;
+    }
+  }
+
+  // Update plugin enabled state in storage
+  async updatePluginEnabled(pluginId, isEnabled) {
+    try {
+      const pluginSettings = await this.getPluginSettings();
+      
+      if (isEnabled) {
+        if (!pluginSettings.enabled.includes(pluginId)) {
+          pluginSettings.enabled.push(pluginId);
+        }
+      } else {
+        pluginSettings.enabled = pluginSettings.enabled.filter(id => id !== pluginId);
+      }
+
+      await chrome.storage.local.set({
+        'llamb-plugin-settings': pluginSettings
+      });
+    } catch (error) {
+      console.error('Error updating plugin settings:', error);
+      throw error;
     }
   }
 

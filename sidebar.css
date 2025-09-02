@@ -78,15 +78,100 @@
   --llamb-selection-border: transparent;
 }
 
-/* Body modifications for pushing content */
+/* Enhanced body modifications for pushing content */
 body.llamb-sidebar-open {
+  /* Primary approach: body margin */
   margin-right: 380px !important;
-  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  
+  /* Fallback approach: reduce viewport width for complex layouts */
+  box-sizing: border-box !important;
+  width: calc(100vw - 380px) !important;
+  overflow-x: hidden !important;
+  
+  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 body.llamb-sidebar-closed {
   margin-right: 0 !important;
-  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  width: 100vw !important;
+  overflow-x: auto !important;
+  
+  transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Site-specific fixes for known problematic layouts */
+
+/* YouTube specific adjustments */
+body.llamb-sidebar-open ytd-app,
+body.llamb-sidebar-open #masthead-container,
+body.llamb-sidebar-open #page-manager {
+  margin-right: 0 !important;
+  width: calc(100% - 380px) !important;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.llamb-sidebar-closed ytd-app,
+body.llamb-sidebar-closed #masthead-container,
+body.llamb-sidebar-closed #page-manager {
+  width: 100% !important;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Twitter/X specific adjustments */
+body.llamb-sidebar-open #react-root > div,
+body.llamb-sidebar-open main[role="main"] {
+  margin-right: 0 !important;
+  width: calc(100% - 380px) !important;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.llamb-sidebar-closed #react-root > div,
+body.llamb-sidebar-closed main[role="main"] {
+  width: 100% !important;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Generic fixes for common layout patterns */
+body.llamb-sidebar-open .container,
+body.llamb-sidebar-open .wrapper,
+body.llamb-sidebar-open .main-content,
+body.llamb-sidebar-open [role="main"] {
+  margin-right: 0 !important;
+  max-width: calc(100vw - 380px) !important;
+  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.llamb-sidebar-closed .container,
+body.llamb-sidebar-closed .wrapper,
+body.llamb-sidebar-closed .main-content,
+body.llamb-sidebar-closed [role="main"] {
+  max-width: 100vw !important;
+  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Fix for fixed positioned elements */
+body.llamb-sidebar-open [style*="position: fixed"],
+body.llamb-sidebar-open [style*="position: sticky"] {
+  width: calc(100vw - 380px) !important;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+body.llamb-sidebar-closed [style*="position: fixed"],
+body.llamb-sidebar-closed [style*="position: sticky"] {
+  width: 100vw !important;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Remove focus outline from all sidebar buttons */
+#llamb-chat-sidebar button {
+  outline: none !important;
+}
+
+#llamb-chat-sidebar button:focus {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Sidebar Container */
@@ -151,7 +236,7 @@ body.llamb-sidebar-closed {
   flex-shrink: 0;
 }
 
-.llamb-theme-toggle, .llamb-sidebar-close, .llamb-history-btn, .llamb-new-chat-btn {
+.llamb-theme-toggle, .llamb-sidebar-close, .llamb-history-btn, .llamb-new-chat-btn, .llamb-float-toggle {
   background: none;
   border: none;
   color: var(--llamb-text-secondary);
@@ -174,7 +259,7 @@ body.llamb-sidebar-closed {
   font-size: 18px;
 }
 
-.llamb-theme-toggle:hover, .llamb-sidebar-close:hover, .llamb-history-btn:hover, .llamb-new-chat-btn:hover {
+.llamb-theme-toggle:hover, .llamb-sidebar-close:hover, .llamb-history-btn:hover, .llamb-new-chat-btn:hover, .llamb-float-toggle:hover {
   background: var(--llamb-bg-tertiary);
   color: var(--llamb-text-primary);
 }
@@ -195,9 +280,14 @@ body.llamb-sidebar-closed {
   height: 16px;
 }
 
-.llamb-history-icon, .llamb-new-chat-icon {
+.llamb-history-icon, .llamb-new-chat-icon, .llamb-float-icon {
   width: 16px;
   height: 16px;
+}
+
+/* Float icon styling - let it inherit color from parent button */
+.llamb-float-icon {
+  opacity: 1;
 }
 
 /* Theme toggle icon visibility */
@@ -894,8 +984,429 @@ body.llamb-sidebar-closed {
     max-width: 240px;
   }
   
-  .llamb-history-dropdown {
+  .llamb-history-dropdown,
+  .llamb-chip-content-modal {
     left: 8px;
     right: 8px;
+  }
+}
+
+/* Chip Content Modal */
+.llamb-chip-content-modal {
+  position: absolute;
+  top: 60px;
+  left: 12px;
+  right: 12px;
+  background: var(--llamb-bg-primary);
+  border: 1px solid var(--llamb-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  animation: llamb-slide-down 0.2s ease-out;
+}
+
+.llamb-chip-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--llamb-border);
+  background: var(--llamb-bg-secondary);
+  border-radius: 12px 12px 0 0;
+}
+
+.llamb-chip-modal-header span {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--llamb-text-primary);
+}
+
+.llamb-chip-modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--llamb-text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.llamb-chip-modal-close:hover {
+  background: var(--llamb-bg-tertiary);
+  color: var(--llamb-text-primary);
+}
+
+.llamb-chip-modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--llamb-text-primary);
+  min-height: 200px;
+  max-height: 400px;
+}
+
+.llamb-chip-modal-content h1,
+.llamb-chip-modal-content h2,
+.llamb-chip-modal-content h3 {
+  margin: 16px 0 8px 0;
+  font-weight: 600;
+  color: var(--llamb-text-primary);
+}
+
+.llamb-chip-modal-content h2 {
+  font-size: 16px;
+  color: var(--llamb-text-primary);
+}
+
+.llamb-chip-modal-content h3 {
+  font-size: 14px;
+  color: var(--llamb-text-secondary);
+}
+
+.llamb-chip-modal-content p {
+  margin: 8px 0;
+}
+
+.llamb-chip-modal-content ul,
+.llamb-chip-modal-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.llamb-chip-modal-content li {
+  margin: 4px 0;
+}
+
+.llamb-chip-modal-content pre {
+  background: var(--llamb-bg-tertiary);
+  border: 1px solid var(--llamb-border);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.llamb-chip-modal-content code {
+  background: var(--llamb-bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.llamb-chip-modal-content strong {
+  font-weight: 600;
+  color: var(--llamb-text-primary);
+}
+
+.llamb-chip-modal-content .llamb-loading {
+  text-align: center;
+  color: var(--llamb-text-secondary);
+  padding: 40px 20px;
+}
+
+.llamb-chip-modal-content .llamb-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: rgb(239, 68, 68);
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+/* Chip content specific styling */
+.llamb-chip-content-metadata {
+  background: var(--llamb-bg-secondary);
+  border: 1px solid var(--llamb-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 8px 0 16px 0;
+}
+
+.llamb-chip-content-metadata h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--llamb-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.llamb-chip-content-metadata p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--llamb-text-primary);
+}
+
+.llamb-chip-content-actions {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 8px 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--llamb-border);
+}
+
+.llamb-chip-action-btn {
+  background: var(--llamb-bg-tertiary);
+  border: 1px solid var(--llamb-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--llamb-text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.llamb-chip-action-btn:hover {
+  background: var(--llamb-bg-quaternary);
+  border-color: var(--llamb-text-tertiary);
+}
+
+/* Floating Window Mode Styles */
+
+/* Floating window container */
+#llamb-chat-sidebar.llamb-floating-window {
+  position: fixed !important;
+  top: 20px;
+  right: 20px;
+  width: 400px;
+  height: 600px;
+  z-index: 2147483647 !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15), 0 6px 6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid var(--llamb-border) !important;
+  overflow: hidden !important;
+  resize: both !important;
+  min-width: 320px !important;
+  min-height: 400px !important;
+  max-width: 800px !important;
+  max-height: 90vh !important;
+  background: var(--llamb-bg-primary) !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* Floating window header with drag handle */
+#llamb-chat-sidebar.llamb-floating-window .llamb-sidebar-header {
+  cursor: move !important;
+  background: var(--llamb-bg-primary) !important;
+  border-bottom: 1px solid var(--llamb-border) !important;
+  padding: 16px 20px !important;
+  user-select: none !important;
+  position: relative !important;
+}
+
+/* Make header title area specifically draggable */
+#llamb-chat-sidebar.llamb-floating-window .llamb-sidebar-title {
+  cursor: move !important;
+  pointer-events: auto !important;
+}
+
+/* Make logo and text within title draggable too */
+#llamb-chat-sidebar.llamb-floating-window .llamb-sidebar-title img,
+#llamb-chat-sidebar.llamb-floating-window .llamb-sidebar-title span {
+  cursor: move !important;
+  pointer-events: none !important; /* Let events pass through to parent */
+  user-select: none !important;
+}
+
+/* Ensure buttons remain clickable */
+#llamb-chat-sidebar.llamb-floating-window .llamb-header-actions {
+  pointer-events: auto !important;
+}
+
+#llamb-chat-sidebar.llamb-floating-window .llamb-header-actions button {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+/* Floating window header hover effect */
+#llamb-chat-sidebar.llamb-floating-window .llamb-sidebar-header:hover {
+  background: var(--llamb-bg-secondary) !important;
+}
+
+/* Visual indicator for drag area */
+#llamb-chat-sidebar.llamb-floating-window .llamb-sidebar-title::after {
+  content: '⋮⋮' !important;
+  position: absolute !important;
+  left: -10px !important;
+  top: 50% !important;
+  transform: translateY(-50%) rotate(90deg) !important;
+  font-size: 10px !important;
+  color: var(--llamb-text-tertiary) !important;
+  opacity: 0.5 !important;
+  letter-spacing: -2px !important;
+}
+
+/* Update float button icon and tooltip when in floating mode */
+#llamb-chat-sidebar.llamb-floating-window .llamb-float-toggle {
+  background: var(--llamb-selection-bg) !important;
+  color: var(--llamb-selection-text) !important;
+}
+
+/* Resize handle visual indicator */
+#llamb-chat-sidebar.llamb-floating-window::after {
+  content: '' !important;
+  position: absolute !important;
+  bottom: 10px !important;
+  right: 10px !important;
+  width: 8px !important;
+  height: 8px !important;
+  cursor: se-resize !important;
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+  transition: opacity 0.2s ease !important;
+  z-index: 10 !important;
+  /* No border radius needed since it's small and inside the window */
+  /* Create diagonal lines using gradient */
+  background: linear-gradient(
+    135deg,
+    transparent 30%,
+    var(--llamb-text-tertiary) 30%,
+    var(--llamb-text-tertiary) 35%,
+    transparent 35%,
+    transparent 65%,
+    var(--llamb-text-tertiary) 65%,
+    var(--llamb-text-tertiary) 70%,
+    transparent 70%
+  ) !important;
+}
+
+#llamb-chat-sidebar.llamb-floating-window:hover::after {
+  opacity: 0.6 !important;
+}
+
+/* Light mode specific resize handle styling */
+[data-llamb-theme="light"] #llamb-chat-sidebar.llamb-floating-window::after {
+  background: linear-gradient(
+    135deg,
+    transparent 30%,
+    var(--llamb-border) 30%,
+    var(--llamb-border) 35%,
+    transparent 35%,
+    transparent 65%,
+    var(--llamb-border) 65%,
+    var(--llamb-border) 70%,
+    transparent 70%
+  ) !important;
+}
+
+/* Make the bottom-right corner area clickable for resizing - larger hit area */
+#llamb-chat-sidebar.llamb-floating-window::before {
+  content: '' !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  width: 30px !important;
+  height: 30px !important;
+  cursor: se-resize !important;
+  z-index: 100 !important;
+  pointer-events: auto !important;
+  /* Remove the debug background */
+}
+
+/* Floating window content adjustments */
+#llamb-chat-sidebar.llamb-floating-window .llamb-sidebar-content {
+  height: calc(100% - 73px) !important; /* Account for header height */
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+}
+
+#llamb-chat-sidebar.llamb-floating-window .llamb-chat-messages {
+  max-height: none !important;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  flex: 1 !important;
+  padding-bottom: 180px !important; /* Space for the input area */
+}
+
+/* Floating window input container */
+#llamb-chat-sidebar.llamb-floating-window .llamb-chat-input-container {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  background: var(--llamb-bg-primary) !important;
+  border-top: 1px solid var(--llamb-border) !important;
+}
+
+/* Reduce padding for context chips in floating window mode */
+#llamb-chat-sidebar.llamb-floating-window .llamb-context-chips {
+  padding: 8px 16px !important;
+}
+
+/* Adjust input wrapper padding in floating window mode */
+#llamb-chat-sidebar.llamb-floating-window .llamb-input-wrapper {
+  padding: 12px 16px 16px 16px !important;
+}
+
+/* Remove body modifications when in floating mode */
+body.llamb-floating-mode {
+  margin-right: 0 !important;
+  width: 100vw !important;
+  overflow-x: auto !important;
+}
+
+/* Floating window animations */
+#llamb-chat-sidebar.llamb-floating-window.llamb-floating-entering {
+  animation: llamb-float-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+#llamb-chat-sidebar.llamb-floating-window.llamb-floating-exiting {
+  animation: llamb-float-out 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+@keyframes llamb-float-in {
+  from {
+    opacity: 0 !important;
+    transform: scale(0.9) translateY(-20px) !important;
+  }
+  to {
+    opacity: 1 !important;
+    transform: scale(1) translateY(0) !important;
+  }
+}
+
+@keyframes llamb-float-out {
+  from {
+    opacity: 1 !important;
+    transform: scale(1) translateY(0) !important;
+  }
+  to {
+    opacity: 0 !important;
+    transform: scale(0.9) translateY(-20px) !important;
+  }
+}
+
+/* Floating window responsive adjustments */
+@media (max-width: 768px) {
+  #llamb-chat-sidebar.llamb-floating-window {
+    top: 10px !important;
+    right: 10px !important;
+    left: 10px !important;
+    width: calc(100vw - 20px) !important;
+    max-width: none !important;
+    height: 70vh !important;
+  }
+}
+
+@media (max-height: 600px) {
+  #llamb-chat-sidebar.llamb-floating-window {
+    height: 90vh !important;
+    top: 5vh !important;
   }
 }

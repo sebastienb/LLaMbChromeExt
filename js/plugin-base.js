@@ -74,6 +74,41 @@ class LlambPluginBase {
   }
 
   /**
+   * Get detailed content for modal display
+   * This is called when user clicks on the plugin chip to see full content
+   * Should include debugging info, metadata, and full content details
+   * @returns {Promise<string|null>} Detailed content or null if not available
+   */
+  async getDetailedContent() {
+    // Default implementation delegates to getContent
+    const content = await this.getContent();
+    if (!content) return null;
+
+    const pageContext = this.getPageContext();
+    let detailedContent = `# ${this.name}\n\n`;
+    
+    // Add plugin metadata
+    detailedContent += `## Plugin Information\n\n`;
+    detailedContent += `- **Name:** ${this.manifest.name}\n`;
+    detailedContent += `- **Version:** ${this.manifest.version}\n`;
+    detailedContent += `- **ID:** ${this.id}\n`;
+    detailedContent += `- **Status:** ${this.isActive ? 'Active' : 'Inactive'}\n\n`;
+    
+    // Add page information
+    detailedContent += `## Page Context\n\n`;
+    detailedContent += `- **URL:** ${pageContext.url}\n`;
+    detailedContent += `- **Title:** ${pageContext.title}\n`;
+    detailedContent += `- **Domain:** ${pageContext.domain}\n`;
+    detailedContent += `- **Timestamp:** ${pageContext.timestamp}\n\n`;
+    
+    // Add extracted content
+    detailedContent += `## Extracted Content\n\n`;
+    detailedContent += content;
+    
+    return detailedContent;
+  }
+
+  /**
    * Get the context chip data for this plugin
    * @returns {Object|null} Chip data object or null if no chip should be shown
    */

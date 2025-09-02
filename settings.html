@@ -12,9 +12,20 @@
         }
 
         .settings-container {
-            max-width: 1200px;
-            margin: 0 auto;
+            width: 100%;
+            margin: 0;
             padding: var(--llamb-spacing-xl);
+            box-sizing: border-box;
+        }
+        
+        @media (max-width: 768px) {
+            .settings-container {
+                padding: var(--llamb-spacing-md);
+            }
+            
+            .form-2col {
+                grid-template-columns: 1fr;
+            }
         }
 
         .connection-list {
@@ -201,6 +212,151 @@
         .toast.success { background: #34a853; color: white; }
         .toast.error { background: #ea4335; color: white; }
 
+        .plugin-list {
+            display: grid;
+            gap: var(--llamb-spacing-lg);
+        }
+
+        .plugin-card {
+            background: var(--llamb-bg-secondary);
+            border: 1px solid var(--llamb-border);
+            border-radius: var(--llamb-radius-lg);
+            padding: var(--llamb-spacing-xl);
+            position: relative;
+            transition: all var(--llamb-transition-standard);
+        }
+
+        .plugin-card:hover {
+            transform: translateY(-1px);
+        }
+
+        .plugin-card.disabled {
+            opacity: 0.6;
+        }
+
+        .plugin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: var(--llamb-spacing-md);
+        }
+
+        .plugin-info {
+            flex: 1;
+        }
+
+        .plugin-name {
+            font-size: var(--llamb-font-size-lg);
+            font-weight: var(--llamb-font-weight-semibold);
+            color: var(--llamb-text-primary);
+            margin: 0 0 var(--llamb-spacing-xs) 0;
+            display: flex;
+            align-items: center;
+            gap: var(--llamb-spacing-sm);
+        }
+
+        .plugin-icon {
+            font-size: 20px;
+        }
+
+        .plugin-description {
+            font-size: var(--llamb-font-size-sm);
+            color: var(--llamb-text-secondary);
+            margin: 0;
+        }
+
+        .plugin-toggle {
+            margin-left: var(--llamb-spacing-md);
+        }
+
+        .plugin-details {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: var(--llamb-spacing-sm) var(--llamb-spacing-lg);
+            font-size: var(--llamb-font-size-sm);
+            color: var(--llamb-text-secondary);
+            margin-bottom: var(--llamb-spacing-lg);
+        }
+
+        .plugin-matches {
+            grid-column: 1 / -1;
+            font-size: var(--llamb-font-size-xs);
+            color: var(--llamb-text-secondary);
+            background: var(--llamb-bg-primary);
+            padding: var(--llamb-spacing-sm);
+            border-radius: var(--llamb-radius-sm);
+            margin-top: var(--llamb-spacing-sm);
+        }
+
+        .plugin-matches strong {
+            display: block;
+            margin-bottom: var(--llamb-spacing-xs);
+        }
+
+        .plugin-matches ul {
+            margin: 0;
+            padding-left: var(--llamb-spacing-md);
+            list-style-type: disc;
+        }
+
+        .plugin-matches li {
+            font-family: monospace;
+            font-size: var(--llamb-font-size-xs);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--llamb-user-bubble);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        .toggle-slider.round {
+            border-radius: 24px;
+        }
+
+        .toggle-slider.round:before {
+            border-radius: 50%;
+        }
+
         @media (max-width: 768px) {
             .form-2col {
                 grid-template-columns: 1fr;
@@ -279,6 +435,19 @@
                         <label for="show-thinking">Show thinking/reasoning blocks</label>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Plugin Management Section -->
+        <div class="llamb-section">
+            <div class="llamb-section-title">Plugin Management</div>
+            <div id="plugins-container">
+                <div class="empty-state" id="plugins-empty-state" style="display: none;">
+                    <div class="icon">🧩</div>
+                    <h3>No plugins available</h3>
+                    <p>No plugins are registered in the system</p>
+                </div>
+                <div id="plugins-list"></div>
             </div>
         </div>
 

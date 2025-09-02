@@ -40,8 +40,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   });
   
   chrome.contextMenus.create({
-    id: "quick-settings", 
-    title: "Quick Settings",
+    id: "settings", 
+    title: "Settings",
     contexts: ["all"]
   });
   
@@ -96,13 +96,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         await chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
         break;
         
-      case "quick-settings":
+      case "settings":
         // Open popup.html in a new popup window, sized appropriately
         await chrome.windows.create({
           url: chrome.runtime.getURL('popup.html'),
           type: 'popup',
-          width: 420,   // Comfortable width for the responsive design
-          height: 520   // Appropriate height for all content
+          width: 800,   // Larger width to show content properly
+          height: 700   // Increased height for better content display
         });
         break;
         
@@ -215,6 +215,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
     case 'exportChat':
       handleExportChat(request.chatId, sendResponse);
+      return true;
+      
+    case 'fetchYoutubeCaptions':
+      console.log('Background: Handling fetchYoutubeCaptions request:', request.captionUrl);
+      handleFetchYoutubeCaptions(request.captionUrl, sendResponse);
+      return true;
+      
+    case 'getAvailablePlugins':
+      handleGetAvailablePlugins(sendResponse);
+      return true;
+      
+    case 'enablePlugin':
+      handleEnablePlugin(request.pluginId, sendResponse);
+      return true;
+      
+    case 'disablePlugin':
+      handleDisablePlugin(request.pluginId, sendResponse);
       return true;
       
     default:
@@ -524,6 +541,159 @@ async function handleExportChat(chatId, sendResponse) {
     sendResponse({ success: true, markdown });
   } catch (error) {
     console.error('Background: Error exporting chat:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Fetch YouTube captions from background context to bypass CORS
+async function handleFetchYoutubeCaptions(captionUrl, sendResponse) {
+  try {
+    console.log('Background: Fetching YouTube captions from:', captionUrl);
+    
+    const response = await fetch(captionUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    console.log('Background: Caption fetch response status:', response.status);
+    console.log('Background: Response headers:', [...response.headers.entries()]);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const text = await response.text();
+    console.log('Background: Raw response text length:', text.length);
+    console.log('Background: Raw response sample:', text.substring(0, 200));
+    
+    if (!text.trim()) {
+      throw new Error('Empty response from caption API');
+    }
+    
+    try {
+      const captionData = JSON.parse(text);
+      console.log('Background: Successfully parsed caption JSON, events:', captionData.events?.length || 'No events');
+      sendResponse({ 
+        success: true, 
+        data: captionData,
+        rawLength: text.length 
+      });
+    } catch (parseError) {
+      console.error('Background: Failed to parse caption response as JSON:', parseError.message);
+      sendResponse({ 
+        success: false, 
+        error: `JSON parse error: ${parseError.message}`,
+        rawText: text.substring(0, 500) // Send first 500 chars for debugging
+      });
+    }
+    
+  } catch (error) {
+    console.error('Background: Error fetching YouTube captions:', error);
+    sendResponse({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+}
+
+// Get available plugins
+async function handleGetAvailablePlugins(sendResponse) {
+  try {
+    // Return the list of hardcoded plugins for now
+    // In the future, this could be dynamically discovered
+    const plugins = [
+      {
+        id: 'youtube-captions',
+        name: 'YouTube Captions',
+        description: 'Extract captions from YouTube videos',
+        version: '1.0.0',
+        icon: '💬',
+        matches: ['*://www.youtube.com/watch*', '*://youtube.com/watch*'],
+        permissions: ['extractContent']
+      }
+    ];
+    
+    sendResponse({ success: true, plugins });
+  } catch (error) {
+    console.error('Background: Error getting available plugins:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Enable a plugin
+async function handleEnablePlugin(pluginId, sendResponse) {
+  try {
+    console.log('Background: Enabling plugin:', pluginId);
+    
+    // Get current plugin settings
+    const result = await chrome.storage.local.get('llamb-plugin-settings');
+    const settings = result['llamb-plugin-settings'] || { enabled: [], plugins: {} };
+    
+    // Add plugin to enabled list if not already there
+    if (!settings.enabled.includes(pluginId)) {
+      settings.enabled.push(pluginId);
+    }
+    
+    // Save updated settings
+    await chrome.storage.local.set({ 'llamb-plugin-settings': settings });
+    
+    // Notify all tabs to update their plugin state
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          action: 'pluginStateChanged',
+          pluginId: pluginId,
+          enabled: true
+        });
+      } catch (error) {
+        // Tab may not have content script, ignore
+      }
+    }
+    
+    console.log('Background: Plugin enabled successfully:', pluginId);
+    sendResponse({ success: true });
+  } catch (error) {
+    console.error('Background: Error enabling plugin:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Disable a plugin
+async function handleDisablePlugin(pluginId, sendResponse) {
+  try {
+    console.log('Background: Disabling plugin:', pluginId);
+    
+    // Get current plugin settings
+    const result = await chrome.storage.local.get('llamb-plugin-settings');
+    const settings = result['llamb-plugin-settings'] || { enabled: [], plugins: {} };
+    
+    // Remove plugin from enabled list
+    settings.enabled = settings.enabled.filter(id => id !== pluginId);
+    
+    // Save updated settings
+    await chrome.storage.local.set({ 'llamb-plugin-settings': settings });
+    
+    // Notify all tabs to update their plugin state
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          action: 'pluginStateChanged',
+          pluginId: pluginId,
+          enabled: false
+        });
+      } catch (error) {
+        // Tab may not have content script, ignore
+      }
+    }
+    
+    console.log('Background: Plugin disabled successfully:', pluginId);
+    sendResponse({ success: true });
+  } catch (error) {
+    console.error('Background: Error disabling plugin:', error);
     sendResponse({ success: false, error: error.message });
   }
 }

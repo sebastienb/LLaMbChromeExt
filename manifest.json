@@ -56,7 +56,8 @@
         "js/plugin-base.js",
         "plugins/youtube-captions/plugin.js",
         "plugins/youtube-captions/manifest.json",
-        "icons/icon128.png"
+        "icons/icon128.png",
+        "icons/window.svg"
       ],
       "matches": ["<all_urls>"]
     }

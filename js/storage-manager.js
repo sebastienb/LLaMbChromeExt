@@ -422,14 +422,28 @@ class StorageManager {
     }
   }
 
-  async setSidebarState(tabId, isVisible, chatId = null) {
+  async setSidebarState(tabId, state) {
     try {
+      // Handle both old format (isVisible, chatId) and new format (state object)
+      const stateToSave = typeof state === 'object' && state.hasOwnProperty('isVisible') ? {
+        isVisible: state.isVisible,
+        isFloatingMode: state.isFloatingMode || false,
+        floatingPosition: state.floatingPosition || { x: 20, y: 20 },
+        floatingSize: state.floatingSize || { width: 400, height: 600 },
+        chatId: state.chatId,
+        timestamp: Date.now()
+      } : {
+        // Legacy format support
+        isVisible: state,
+        isFloatingMode: false,
+        floatingPosition: { x: 20, y: 20 },
+        floatingSize: { width: 400, height: 600 },
+        chatId: arguments[2] || null,
+        timestamp: Date.now()
+      };
+      
       await chrome.storage.session.set({
-        [`${this.sidebarStateKey}-${tabId}`]: {
-          isVisible: isVisible,
-          chatId: chatId,
-          timestamp: Date.now()
-        }
+        [`${this.sidebarStateKey}-${tabId}`]: stateToSave
       });
       return true;
     } catch (error) {

@@ -10,6 +10,9 @@
 
   let sidebar = null;
   let isVisible = false;
+  let isFloatingMode = false;
+  let floatingPosition = { x: 20, y: 20 };
+  let floatingSize = { width: 400, height: 600 };
   let preservedSelections = []; // Array to store multiple selections
   let selectionCounter = 0;
   
@@ -122,10 +125,8 @@
           await pluginManager.initialize();
           console.log('LlamB: PluginManager initialized successfully');
           
-          // Enable YouTube captions plugin by default
-          console.log('LlamB: Enabling YouTube captions plugin...');
-          const enabled = await pluginManager.enablePlugin('youtube-captions');
-          console.log('LlamB: YouTube captions plugin enabled:', enabled);
+          // Plugin enablement is now managed through settings
+          console.log('LlamB: PluginManager will load enabled plugins from storage');
           
           // Notify plugins of current page
           console.log('LlamB: Notifying plugins of page change...');
@@ -183,7 +184,19 @@
       const sidebarState = await storageManager.getSidebarState(tabId);
       console.log('LlamB: Restored sidebar state:', sidebarState);
       
-      if (sidebarState.isVisible) {
+      // Handle both old and new state formats
+      const stateIsVisible = sidebarState.isVisible || sidebarState;
+      const stateIsFloating = sidebarState.isFloatingMode || false;
+      const statePosition = sidebarState.floatingPosition || { x: 20, y: 20 };
+      const stateSize = sidebarState.floatingSize || { width: 400, height: 600 };
+      const stateChatId = sidebarState.chatId || null;
+      
+      if (stateIsVisible) {
+        // Restore floating mode settings
+        isFloatingMode = stateIsFloating;
+        floatingPosition = statePosition;
+        floatingSize = stateSize;
+        
         // Create sidebar if it doesn't exist
         if (!sidebar) {
           sidebar = createSidebar();
@@ -191,15 +204,13 @@
           detectAndApplyTheme();
         }
         
-        // Restore visibility
+        // Restore visibility and mode
         isVisible = true;
-        sidebar.className = 'llamb-sidebar-visible';
-        document.body.classList.remove('llamb-sidebar-closed');
-        document.body.classList.add('llamb-sidebar-open');
+        updateSidebarDisplay();
         
         // Restore chat if specified
-        if (sidebarState.chatId && chatManager) {
-          await loadChat(sidebarState.chatId);
+        if (stateChatId && chatManager) {
+          await loadChat(stateChatId);
         }
       }
     } catch (error) {
@@ -209,6 +220,16 @@
 
   // Save current sidebar state
   async function saveSidebarState() {
+    // Save to localStorage for mode preference (persistent across sessions)
+    try {
+      localStorage.setItem('llamb-mode-preference', isFloatingMode ? 'floating' : 'sidebar');
+      localStorage.setItem('llamb-floating-position', JSON.stringify(floatingPosition));
+      localStorage.setItem('llamb-floating-size', JSON.stringify(floatingSize));
+      console.log('LlamB: Saved mode preference:', isFloatingMode ? 'floating' : 'sidebar');
+    } catch (e) {
+      console.error('LlamB: Error saving to localStorage:', e);
+    }
+    
     if (!tabId) {
       console.log('LlamB: No tabId available for state saving');
       return;
@@ -221,7 +242,14 @@
     
     try {
       const chatId = currentChat ? currentChat.id : null;
-      await storageManager.setSidebarState(tabId, isVisible, chatId);
+      const state = {
+        isVisible,
+        isFloatingMode,
+        floatingPosition,
+        floatingSize,
+        chatId
+      };
+      await storageManager.setSidebarState(tabId, state);
     } catch (error) {
       console.error('LlamB: Error saving sidebar state:', error);
     }
@@ -346,6 +374,248 @@
     if (searchInput) {
       searchInput.value = '';
     }
+  }
+
+  // Chip content modal management
+  function showChipContentModal(chipType, chipData) {
+    const modal = document.getElementById('llamb-chip-content-modal');
+    const titleElement = document.getElementById('llamb-chip-modal-title');
+    const contentElement = document.getElementById('llamb-chip-modal-content');
+    
+    if (!modal || !titleElement || !contentElement) return;
+
+    // Hide history dropdown if open
+    hideHistoryDropdown();
+    
+    // Set title based on chip type
+    let title = 'Chip Content';
+    switch (chipType) {
+      case 'selection':
+        title = 'Selected Text';
+        break;
+      case 'plugin':
+        title = chipData.name || chipData.text || 'Plugin Content';
+        break;
+      case 'page':
+        title = 'Page Information';
+        break;
+      default:
+        title = chipData.title || 'Content Details';
+    }
+    
+    titleElement.textContent = title;
+    contentElement.innerHTML = '<div class="llamb-loading">Loading content...</div>';
+    
+    // Show modal
+    modal.style.display = 'flex';
+    
+    // Load content asynchronously
+    loadChipContent(chipType, chipData, contentElement);
+  }
+
+  function hideChipContentModal() {
+    const modal = document.getElementById('llamb-chip-content-modal');
+    if (!modal) return;
+    
+    modal.style.display = 'none';
+  }
+
+  async function loadChipContent(chipType, chipData, contentElement) {
+    try {
+      let content = '';
+      let metadata = {};
+      
+      switch (chipType) {
+        case 'selection':
+          content = await getSelectionContent(chipData);
+          metadata = {
+            'Text Length': chipData.text.length + ' characters',
+            'Word Count': chipData.text.split(/\s+/).length + ' words',
+            'Captured': new Date(chipData.timestamp).toLocaleString()
+          };
+          break;
+          
+        case 'plugin':
+          content = await getPluginContent(chipData);
+          metadata = await getPluginMetadata(chipData);
+          break;
+          
+        case 'page':
+          content = await getPageContent();
+          metadata = {
+            'URL': window.location.href,
+            'Title': document.title,
+            'Domain': window.location.hostname,
+            'Last Updated': new Date().toLocaleString()
+          };
+          break;
+          
+        default:
+          content = 'No content available';
+      }
+      
+      // Render content with metadata
+      renderChipModalContent(contentElement, content, metadata, chipType);
+      
+    } catch (error) {
+      console.error('LlamB: Error loading chip content:', error);
+      contentElement.innerHTML = '<div class="llamb-error">Failed to load content: ' + error.message + '</div>';
+    }
+  }
+
+  async function getSelectionContent(chipData) {
+    return `## Selected Text\n\n${chipData.text}`;
+  }
+
+  async function getPluginContent(chipData) {
+    if (!pluginManager) return 'Plugin manager not available';
+    
+    const plugin = pluginManager.plugins.get(chipData.pluginId);
+    if (!plugin) return 'Plugin not found';
+    
+    // Try to get detailed content if available
+    if (typeof plugin.getDetailedContent === 'function') {
+      const detailedContent = await plugin.getDetailedContent();
+      if (detailedContent) return detailedContent;
+    }
+    
+    // Fall back to regular content
+    if (typeof plugin.getContent === 'function') {
+      const content = await plugin.getContent();
+      if (content) return content;
+    }
+    
+    return 'No content available from plugin';
+  }
+
+  async function getPluginMetadata(chipData) {
+    if (!pluginManager) return {};
+    
+    const plugin = pluginManager.plugins.get(chipData.pluginId);
+    if (!plugin) return {};
+    
+    const manifest = pluginManager.pluginRegistry.get(chipData.pluginId);
+    return {
+      'Plugin': manifest?.name || chipData.pluginId,
+      'Version': manifest?.version || 'Unknown',
+      'Status': chipData.status || 'Unknown',
+      'Description': chipData.description || manifest?.description || ''
+    };
+  }
+
+  async function getPageContent() {
+    const pageContext = pluginManager?.getCurrentPageContext() || {
+      url: window.location.href,
+      title: document.title,
+      domain: window.location.hostname,
+      selectedText: window.getSelection()?.toString() || ''
+    };
+    
+    let content = `## Page Information\n\n`;
+    content += `**Title:** ${pageContext.title}\n\n`;
+    content += `**URL:** ${pageContext.url}\n\n`;
+    content += `**Domain:** ${pageContext.domain}\n\n`;
+    
+    if (pageContext.selectedText) {
+      content += `**Current Selection:** ${pageContext.selectedText}\n\n`;
+    }
+    
+    // Add meta description if available
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc && metaDesc.content) {
+      content += `**Description:** ${metaDesc.content}\n\n`;
+    }
+    
+    return content;
+  }
+
+  function renderChipModalContent(contentElement, content, metadata, chipType) {
+    let html = '';
+    
+    // Add metadata section if available
+    if (Object.keys(metadata).length > 0) {
+      html += '<div class="llamb-chip-content-metadata">';
+      html += '<h4>Information</h4>';
+      for (const [key, value] of Object.entries(metadata)) {
+        if (value) {
+          html += `<p><strong>${key}:</strong> ${value}</p>`;
+        }
+      }
+      html += '</div>';
+    }
+    
+    // Add main content
+    if (content) {
+      html += markdownToHtml(content);
+    }
+    
+    // Add action buttons
+    html += '<div class="llamb-chip-content-actions">';
+    html += '<button class="llamb-chip-action-btn" onclick="copyChipContent()">Copy Content</button>';
+    if (chipType === 'plugin') {
+      html += '<button class="llamb-chip-action-btn" onclick="refreshPluginContent()">Refresh</button>';
+    }
+    html += '</div>';
+    
+    contentElement.innerHTML = html;
+    
+    // Store content for copy function
+    contentElement.dataset.content = content;
+    contentElement.dataset.chipType = chipType;
+  }
+
+  // Copy content to clipboard
+  window.copyChipContent = function() {
+    const contentElement = document.getElementById('llamb-chip-modal-content');
+    const content = contentElement?.dataset.content;
+    
+    if (content) {
+      navigator.clipboard.writeText(content).then(() => {
+        // Show brief feedback
+        const copyBtn = contentElement.querySelector('.llamb-chip-action-btn');
+        if (copyBtn) {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => {
+            copyBtn.textContent = originalText;
+          }, 1500);
+        }
+      });
+    }
+  };
+
+  // Refresh plugin content
+  window.refreshPluginContent = function() {
+    const contentElement = document.getElementById('llamb-chip-modal-content');
+    const chipType = contentElement?.dataset.chipType;
+    
+    if (chipType === 'plugin') {
+      contentElement.innerHTML = '<div class="llamb-loading">Refreshing content...</div>';
+      // This would need to be implemented based on the specific plugin
+      // For now, just reload the modal
+      setTimeout(() => {
+        // Would need to access the original chipData
+        contentElement.innerHTML = '<div class="llamb-error">Refresh not implemented yet</div>';
+      }, 1000);
+    }
+  };
+
+  // Simple markdown to HTML converter for modal content
+  function markdownToHtml(markdown) {
+    return markdown
+      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>')
+      .replace(/^(.)/gm, '<p>$1')
+      .replace(/$(.)/gm, '$1</p>')
+      .replace(/<p><\/p>/g, '')
+      .replace(/<p>(<h[1-6]>)/g, '$1')
+      .replace(/(<\/h[1-6]>)<\/p>/g, '$1');
   }
 
   async function loadChatHistory() {
@@ -1075,6 +1345,17 @@
       <button class="llamb-chip-close" aria-label="Clear selection">×</button>
     `;
     
+    // Add click handler to show selection content
+    chip.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Don't show modal if clicking the close button
+      if (e.target.classList.contains('llamb-chip-close')) {
+        return;
+      }
+      showChipContentModal('selection', selection);
+    });
+
     // Add click handler to remove specific selection
     chip.querySelector('.llamb-chip-close').addEventListener('click', (e) => {
       e.preventDefault();
@@ -1129,11 +1410,14 @@
       ${statusIcon}
     `;
     
-    // Add click handler to toggle chip
+    // Add click handler to show content modal
     chip.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      togglePluginChip(chipData.pluginId);
+      showChipContentModal('plugin', {
+        ...chipData,
+        pluginId: chipData.pluginId
+      });
     });
     
     // Add hover tooltip
@@ -1220,6 +1504,11 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
           </button>
+          <button class="llamb-float-toggle" id="llamb-float-btn" title="Switch to floating window">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-float-icon">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 8.25V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18V8.25m-18 0V6a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 6v2.25m-18 0h18M5.25 6h.008v.008H5.25V6ZM7.5 6h.008v.008H7.5V6Zm2.25 0h.008v.008H9.75V6Z" />
+            </svg>
+          </button>
           <button class="llamb-theme-toggle" id="llamb-theme-btn" title="Toggle theme">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-theme-icon llamb-theme-light-icon">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
@@ -1245,6 +1534,15 @@
         </div>
         <div class="llamb-history-list" id="llamb-history-list">
           <div class="llamb-loading">Loading chat history...</div>
+        </div>
+      </div>
+      <div class="llamb-chip-content-modal" id="llamb-chip-content-modal" style="display: none;">
+        <div class="llamb-chip-modal-header">
+          <span id="llamb-chip-modal-title">Chip Content</span>
+          <button class="llamb-chip-modal-close" id="llamb-chip-modal-close">×</button>
+        </div>
+        <div class="llamb-chip-modal-content" id="llamb-chip-modal-content">
+          <div class="llamb-loading">Loading content...</div>
         </div>
       </div>
       <div class="llamb-sidebar-content">
@@ -1317,6 +1615,33 @@
     // Capture selection before showing sidebar
     if (!isVisible) {
       captureSelection();
+      
+      // Restore mode preference when opening
+      try {
+        const savedMode = localStorage.getItem('llamb-mode-preference');
+        const savedPosition = localStorage.getItem('llamb-floating-position');
+        const savedSize = localStorage.getItem('llamb-floating-size');
+        
+        if (savedMode === 'floating') {
+          isFloatingMode = true;
+          console.log('LlamB: Restored floating mode preference');
+        } else if (savedMode === 'sidebar') {
+          isFloatingMode = false;
+          console.log('LlamB: Restored sidebar mode preference');
+        }
+        
+        if (savedPosition) {
+          floatingPosition = JSON.parse(savedPosition);
+          console.log('LlamB: Restored floating position:', floatingPosition);
+        }
+        
+        if (savedSize) {
+          floatingSize = JSON.parse(savedSize);
+          console.log('LlamB: Restored floating size:', floatingSize);
+        }
+      } catch (e) {
+        console.error('LlamB: Error restoring preferences from localStorage:', e);
+      }
     }
     
     if (!sidebar) {
@@ -1330,31 +1655,148 @@
     isVisible = !isVisible;
     console.log('LlamB: Setting isVisible to:', isVisible);
     
-    // Update sidebar classes
-    sidebar.className = isVisible ? 'llamb-sidebar-visible' : 'llamb-sidebar-hidden';
-    console.log('LlamB: Set sidebar className to:', sidebar.className);
+    // Update sidebar based on current mode
+    updateSidebarDisplay();
     
-    // Update body classes to push content
+    // Save sidebar state
+    saveSidebarState();
+  }
+  
+  // Update sidebar display based on current mode
+  function updateSidebarDisplay() {
+    if (!sidebar) return;
+    
     if (isVisible) {
-      document.body.classList.remove('llamb-sidebar-closed');
-      document.body.classList.add('llamb-sidebar-open');
-      console.log('LlamB: Added llamb-sidebar-open to body');
+      // Always remove display:none when showing
+      sidebar.style.display = '';
       
-      // Update context chips when showing sidebar
+      if (isFloatingMode) {
+        // Floating window mode
+        sidebar.className = 'llamb-floating-window llamb-floating-entering';
+        
+        // Position using right/top initially
+        const rightPos = floatingPosition.x || 20;
+        const topPos = floatingPosition.y || 20;
+        
+        sidebar.style.top = topPos + 'px';
+        sidebar.style.right = rightPos + 'px';
+        sidebar.style.left = 'auto';
+        sidebar.style.bottom = 'auto';
+        sidebar.style.width = floatingSize.width + 'px';
+        sidebar.style.height = floatingSize.height + 'px';
+        
+        // Update body for floating mode
+        document.body.classList.remove('llamb-sidebar-open', 'llamb-sidebar-closed');
+        document.body.classList.add('llamb-floating-mode');
+        
+        // Update button tooltip
+        const floatBtn = document.getElementById('llamb-float-btn');
+        if (floatBtn) {
+          floatBtn.title = 'Switch to sidebar mode';
+        }
+      } else {
+        // Sidebar mode
+        sidebar.className = 'llamb-sidebar-visible';
+        sidebar.style.top = '0';
+        sidebar.style.right = '0';
+        sidebar.style.left = 'auto';
+        sidebar.style.bottom = 'auto';
+        sidebar.style.width = '380px';
+        sidebar.style.height = '100vh';
+        
+        // Update body for sidebar mode
+        document.body.classList.remove('llamb-floating-mode', 'llamb-sidebar-closed');
+        document.body.classList.add('llamb-sidebar-open');
+        
+        // Update button tooltip
+        const floatBtn = document.getElementById('llamb-float-btn');
+        if (floatBtn) {
+          floatBtn.title = 'Switch to floating window';
+        }
+        
+        // Handle layout changes for sidebar mode
+        setTimeout(() => {
+          handlePageLayoutChange();
+        }, 100);
+      }
+      
+      // Update context chips when showing
       setTimeout(() => {
         updateContextChips();
         updatePluginChips();
       }, 100);
+      
+      // Remove entering animation class and setup interactions
+      setTimeout(() => {
+        if (sidebar.classList.contains('llamb-floating-entering')) {
+          sidebar.classList.remove('llamb-floating-entering');
+        }
+        // Reinitialize interactions after mode changes
+        if (isFloatingMode) {
+          setupFloatingWindowInteractions();
+        }
+      }, 300);
     } else {
-      document.body.classList.remove('llamb-sidebar-open');
+      // Hide sidebar
+      if (isFloatingMode) {
+        // Window mode - instant hide, no animation
+        sidebar.style.display = 'none';
+        sidebar.className = 'llamb-sidebar-hidden';
+      } else {
+        // Sidebar mode - keep the sliding animation
+        sidebar.className = 'llamb-sidebar-hidden';
+        // Don't set display:none for sidebar mode, let the transform handle it
+      }
+      
+      // Update body classes
+      document.body.classList.remove('llamb-sidebar-open', 'llamb-floating-mode');
       document.body.classList.add('llamb-sidebar-closed');
-      console.log('LlamB: Added llamb-sidebar-closed to body');
       
       // Clear all selections when sidebar closes
       clearAllSelections();
+      
+      // Reset layout changes
+      setTimeout(() => {
+        handlePageLayoutChange();
+      }, 100);
+    }
+  }
+  
+  // Toggle between floating and sidebar modes
+  function toggleFloatingMode() {
+    console.log('LlamB: toggleFloatingMode called, current isFloatingMode:', isFloatingMode);
+    
+    isFloatingMode = !isFloatingMode;
+    
+    if (isFloatingMode) {
+      // Switching TO floating mode - remove body modifications
+      document.body.classList.remove('llamb-sidebar-open', 'llamb-sidebar-closed');
+      document.body.classList.add('llamb-floating-mode');
+      
+      // Reset any layout changes that were made for sidebar mode
+      handlePageLayoutChange();
+    } else {
+      // Switching FROM floating mode back to sidebar mode
+      document.body.classList.remove('llamb-floating-mode');
+      
+      if (isVisible) {
+        // Reapply sidebar body classes
+        document.body.classList.add('llamb-sidebar-open');
+        document.body.classList.remove('llamb-sidebar-closed');
+        
+        // Reapply layout changes for sidebar mode
+        setTimeout(() => {
+          handlePageLayoutChange();
+        }, 100);
+      }
     }
     
-    // Save sidebar state
+    // If sidebar is visible, update display immediately
+    if (isVisible) {
+      updateSidebarDisplay();
+    }
+    
+    // Save state
     saveSidebarState();
   }
 
@@ -1365,6 +1807,7 @@
     const themeBtn = document.getElementById('llamb-theme-btn');
     const historyBtn = document.getElementById('llamb-history-btn');
     const newChatBtn = document.getElementById('llamb-new-chat-btn');
+    const floatBtn = document.getElementById('llamb-float-btn');
     const sendBtn = document.getElementById('llamb-send-btn');
     const chatInput = document.getElementById('llamb-chat-input');
 
@@ -1372,6 +1815,26 @@
     console.log('LlamB: toggleBtn found:', !!toggleBtn);
     console.log('LlamB: closeBtn found:', !!closeBtn);
     console.log('LlamB: themeBtn found:', !!themeBtn);
+    console.log('LlamB: historyBtn found:', !!historyBtn);
+    console.log('LlamB: newChatBtn found:', !!newChatBtn);
+    console.log('LlamB: floatBtn found:', !!floatBtn);
+    console.log('LlamB: sendBtn found:', !!sendBtn);
+    
+    // Debug: Check if buttons exist in DOM
+    const allBtns = document.querySelectorAll('button[id*="llamb"]');
+    console.log('LlamB: All llamb buttons in DOM:', allBtns.length);
+    allBtns.forEach(btn => {
+      console.log('LlamB: Found button:', btn.id, btn.className);
+    });
+    
+    // Fallback: Try again with slight delay if buttons not found
+    if (!toggleBtn || !closeBtn || !themeBtn || !floatBtn) {
+      console.log('LlamB: Some buttons not found, retrying in 100ms...');
+      setTimeout(() => {
+        setupEventListeners();
+      }, 100);
+      return;
+    }
     
     if (toggleBtn) {
       toggleBtn.addEventListener('click', (e) => {
@@ -1387,13 +1850,15 @@
         console.log('LlamB: Close button clicked!');
         e.preventDefault();
         e.stopPropagation();
-        isVisible = false;
-        sidebar.classList.remove('llamb-sidebar-visible');
-        sidebar.classList.add('llamb-sidebar-hidden');
         
-        // Update body classes to restore normal layout
-        document.body.classList.remove('llamb-sidebar-open');
-        document.body.classList.add('llamb-sidebar-closed');
+        // Set visibility to false
+        isVisible = false;
+        
+        // Update sidebar display properly using the same function as toggle
+        updateSidebarDisplay();
+        
+        // Save state
+        saveSidebarState();
       });
     }
 
@@ -1421,6 +1886,15 @@
         e.preventDefault();
         e.stopPropagation();
         startNewChat();
+      });
+    }
+
+    if (floatBtn) {
+      floatBtn.addEventListener('click', (e) => {
+        console.log('LlamB: Float button clicked!');
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFloatingMode();
       });
     }
 
@@ -1470,12 +1944,278 @@
       });
     }
 
+    // Close history dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      const historyDropdown = document.getElementById('llamb-history-dropdown');
+      const historyBtn = document.getElementById('llamb-history-btn');
+      
+      if (historyDropdown && historyDropdown.style.display !== 'none') {
+        // Check if click is outside the dropdown and not on the history button
+        if (!historyDropdown.contains(e.target) && !historyBtn.contains(e.target)) {
+          hideHistoryDropdown();
+        }
+      }
+    });
+
     const historySearch = document.getElementById('llamb-history-search');
     if (historySearch) {
       historySearch.addEventListener('input', (e) => {
         filterChatHistory(e.target.value);
       });
     }
+
+    // Chip content modal close button
+    const chipModalClose = document.getElementById('llamb-chip-modal-close');
+    if (chipModalClose) {
+      chipModalClose.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        hideChipContentModal();
+      });
+    }
+
+    // Add escape key handler for modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const chipModal = document.getElementById('llamb-chip-content-modal');
+        if (chipModal && chipModal.style.display === 'flex') {
+          hideChipContentModal();
+        }
+      }
+    });
+
+    // Page chip click handler
+    const pageChip = document.querySelector('.llamb-chip-page');
+    if (pageChip) {
+      pageChip.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showChipContentModal('page', {
+          title: document.title,
+          url: window.location.href,
+          domain: window.location.hostname
+        });
+      });
+    }
+    
+    // Setup floating window drag and resize functionality
+    setupFloatingWindowInteractions();
+  }
+  
+  // Initialize global drag handlers once (function to be called later)
+  function initializeGlobalDragHandlers() {
+    if (window.llambDragHandlersInitialized) return;
+    
+    window.llambDragHandlersInitialized = true;
+    window.llambDragState = {
+      isDragging: false,
+      isResizing: false,
+      dragStart: { x: 0, y: 0 },
+      resizeStart: { x: 0, y: 0, width: 0, height: 0 }
+    };
+    
+    // Store sidebar reference globally for drag handlers
+    window.llambSidebar = sidebar;
+    
+    // Global mouse move handler
+    document.addEventListener('mousemove', (e) => {
+      const dragSidebar = window.llambSidebar || sidebar || document.getElementById('llamb-chat-sidebar');
+      if (window.llambDragState && window.llambDragState.isDragging && dragSidebar) {
+        console.log('LlamB: Global drag move detected at:', e.clientX, e.clientY);
+        
+        // Calculate new position
+        const newLeft = e.clientX - window.llambDragState.dragStart.x;
+        const newTop = e.clientY - window.llambDragState.dragStart.y;
+        
+        // Keep within viewport bounds
+        const maxLeft = window.innerWidth - dragSidebar.offsetWidth;
+        const maxTop = window.innerHeight - dragSidebar.offsetHeight;
+        
+        const boundedLeft = Math.max(0, Math.min(maxLeft, newLeft));
+        const boundedTop = Math.max(0, Math.min(maxTop, newTop));
+        
+        console.log('LlamB: Setting new position - left:', boundedLeft, 'top:', boundedTop);
+        
+        // Apply position using left/top instead of right/top
+        dragSidebar.style.left = boundedLeft + 'px';
+        dragSidebar.style.top = boundedTop + 'px';
+        dragSidebar.style.right = 'auto';
+        dragSidebar.style.bottom = 'auto';
+        
+        // Update stored position (convert to right-based for consistency)
+        floatingPosition.x = window.innerWidth - boundedLeft - dragSidebar.offsetWidth;
+        floatingPosition.y = boundedTop;
+        
+        e.preventDefault();
+      }
+      
+      if (window.llambDragState && window.llambDragState.isResizing) {
+        // Always get fresh reference to sidebar
+        const resizeSidebar = document.getElementById('llamb-chat-sidebar');
+        if (!resizeSidebar) {
+          console.log('LlamB: Could not find sidebar for resizing');
+          return;
+        }
+        
+        console.log('LlamB: Global resize move detected at:', e.clientX, e.clientY);
+        const deltaX = e.clientX - window.llambDragState.resizeStart.x;
+        const deltaY = e.clientY - window.llambDragState.resizeStart.y;
+        
+        const newWidth = window.llambDragState.resizeStart.width + deltaX;
+        const newHeight = window.llambDragState.resizeStart.height + deltaY;
+        
+        console.log('LlamB: New size:', newWidth, 'x', newHeight);
+        
+        // Apply min/max constraints
+        const constrainedWidth = Math.max(320, Math.min(800, newWidth));
+        const constrainedHeight = Math.max(400, Math.min(window.innerHeight * 0.9, newHeight));
+        
+        console.log('LlamB: Applying size:', constrainedWidth, 'x', constrainedHeight);
+        
+        // Apply the new size
+        resizeSidebar.style.width = constrainedWidth + 'px';
+        resizeSidebar.style.height = constrainedHeight + 'px';
+        
+        // Update stored sizes
+        floatingSize.width = constrainedWidth;
+        floatingSize.height = constrainedHeight;
+        
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+    
+    // Global mouse up handler
+    document.addEventListener('mouseup', (e) => {
+      if (window.llambDragState && (window.llambDragState.isDragging || window.llambDragState.isResizing)) {
+        console.log('LlamB: Global mouse up - stopping drag/resize');
+        window.llambDragState.isDragging = false;
+        window.llambDragState.isResizing = false;
+        document.body.style.cursor = 'auto';
+        document.body.style.userSelect = 'auto';
+        if (sidebar) {
+          sidebar.style.cursor = 'auto';
+        }
+        saveSidebarState();
+        e.preventDefault();
+      }
+    }, true);
+  }
+  
+  // Setup dragging and resizing for floating window
+  function setupFloatingWindowInteractions() {
+    console.log('LlamB: Setting up floating window interactions');
+    
+    if (!sidebar) return;
+    
+    // Update global sidebar reference
+    window.llambSidebar = sidebar;
+    
+    // Initialize global handlers if not already done
+    initializeGlobalDragHandlers();
+    
+    // Remove old listeners if they exist
+    if (window.llambFloatingMouseDown) {
+      sidebar.removeEventListener('mousedown', window.llambFloatingMouseDown);
+    }
+    
+    // Handle header dragging and resize handle
+    window.llambFloatingMouseDown = function handleMouseDown(e) {
+      console.log('LlamB: Mouse down event', e.target, e.target.className, e.target.tagName);
+      
+      if (!sidebar || !sidebar.classList.contains('llamb-floating-window')) {
+        console.log('LlamB: Not in floating mode or no sidebar');
+        return;
+      }
+      
+      // Check if clicking directly on the sidebar
+      if (!sidebar.contains(e.target)) {
+        return;
+      }
+      
+      // Get elements
+      const header = sidebar.querySelector('.llamb-sidebar-header');
+      
+      // Simplified check: if clicking on header and not on a button, allow dragging
+      let isHeaderClick = false;
+      
+      if (header && header.contains(e.target)) {
+        // Check if we're NOT clicking on a button or action area
+        const isButton = e.target.closest('button');
+        const isAction = e.target.closest('.llamb-header-actions');
+        
+        if (!isButton && !isAction) {
+          isHeaderClick = true;
+          console.log('LlamB: Valid header drag area clicked');
+        } else {
+          console.log('LlamB: Clicked on button/action area, not dragging');
+        }
+      }
+      
+      // Check if clicking on resize handle area (bottom-right corner)
+      const rect = sidebar.getBoundingClientRect();
+      const isResizeHandle = e.clientX > rect.right - 30 && 
+                            e.clientX <= rect.right && 
+                            e.clientY > rect.bottom - 30 && 
+                            e.clientY <= rect.bottom;
+      
+      console.log('LlamB: Mouse position:', e.clientX, e.clientY);
+      console.log('LlamB: Sidebar rect:', rect.right, rect.bottom);
+      console.log('LlamB: Header click:', isHeaderClick, 'Resize handle:', isResizeHandle);
+      
+      if (isResizeHandle) {
+        console.log('LlamB: Starting resize from size:', rect.width, 'x', rect.height);
+        // Start resizing
+        window.llambDragState.isResizing = true;
+        window.llambDragState.resizeStart = {
+          x: e.clientX,
+          y: e.clientY,
+          width: rect.width,
+          height: rect.height
+        };
+        e.preventDefault();
+        e.stopPropagation();
+        document.body.style.cursor = 'se-resize';
+        document.body.style.userSelect = 'none';
+      } else if (isHeaderClick) {
+        console.log('LlamB: Starting drag from position:', e.clientX, e.clientY);
+        // Start dragging
+        window.llambDragState.isDragging = true;
+        const rect = sidebar.getBoundingClientRect();
+        window.llambDragState.dragStart = {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        };
+        e.preventDefault();
+        e.stopPropagation();
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+      }
+    };
+    
+    // Add mousedown listener directly to sidebar
+    sidebar.addEventListener('mousedown', window.llambFloatingMouseDown);
+    
+    // Add hover detection for resize handle
+    sidebar.addEventListener('mousemove', (e) => {
+      if (sidebar.classList.contains('llamb-floating-window') && 
+          !window.llambDragState.isDragging && 
+          !window.llambDragState.isResizing) {
+        const rect = sidebar.getBoundingClientRect();
+        const isNearResize = e.clientX > rect.right - 30 && 
+                            e.clientX <= rect.right && 
+                            e.clientY > rect.bottom - 30 && 
+                            e.clientY <= rect.bottom;
+        
+        if (isNearResize) {
+          sidebar.style.cursor = 'se-resize';
+        } else if (!e.target.closest('.llamb-sidebar-header')) {
+          sidebar.style.cursor = 'auto';
+        }
+      }
+    });
+    
+    console.log('LlamB: Floating window interaction listeners added');
   }
 
   // Handle suggested action clicks
@@ -1873,11 +2613,31 @@
 
   // Handle page layout changes for fixed/absolute positioned elements
   function handlePageLayoutChange() {
-    // Some websites have fixed headers/footers that need adjustment
-    const fixedElements = document.querySelectorAll('[style*="position: fixed"], [style*="position: sticky"]');
-    const sidebarWidth = isVisible ? 380 : 0;
+    // If in floating mode, reset everything to normal
+    if (isFloatingMode) {
+      // Reset all positioned elements
+      const positionedElements = document.querySelectorAll('[data-llamb-original-right]');
+      positionedElements.forEach(element => {
+        if (element.dataset.llambOriginalRight) {
+          element.style.right = element.dataset.llambOriginalRight;
+          delete element.dataset.llambOriginalRight;
+        }
+      });
+      
+      // Reset site-specific layouts
+      resetSiteSpecificLayout();
+      return;
+    }
     
-    fixedElements.forEach(element => {
+    // Original sidebar mode logic
+    const sidebarWidth = isVisible && !isFloatingMode ? 380 : 0;
+    
+    // Handle fixed and sticky elements
+    const positionedElements = document.querySelectorAll('[style*="position: fixed"], [style*="position: sticky"]');
+    positionedElements.forEach(element => {
+      // Skip our own sidebar
+      if (element.id === 'llamb-chat-sidebar') return;
+      
       const computedStyle = window.getComputedStyle(element);
       const right = computedStyle.right;
       
@@ -1886,13 +2646,128 @@
         element.dataset.llambOriginalRight = right;
       }
       
-      if (isVisible && element.dataset.llambOriginalRight) {
+      if (isVisible && !isFloatingMode && element.dataset.llambOriginalRight) {
         const originalRight = parseInt(element.dataset.llambOriginalRight) || 0;
         element.style.right = (originalRight + sidebarWidth) + 'px';
-      } else if (!isVisible && element.dataset.llambOriginalRight) {
+      } else if ((!isVisible || isFloatingMode) && element.dataset.llambOriginalRight) {
         element.style.right = element.dataset.llambOriginalRight;
       }
     });
+    
+    // Site-specific adjustments
+    if (!isFloatingMode) {
+      handleSiteSpecificLayout();
+    }
+  }
+  
+  // Reset site-specific layout changes
+  function resetSiteSpecificLayout() {
+    const hostname = window.location.hostname.toLowerCase();
+    
+    // Reset YouTube
+    if (hostname.includes('youtube.com')) {
+      const ytdApp = document.querySelector('ytd-app');
+      const masthead = document.querySelector('#masthead-container');
+      const pageManager = document.querySelector('#page-manager');
+      
+      [ytdApp, masthead, pageManager].forEach(element => {
+        if (element) {
+          element.style.width = '';
+          element.style.marginRight = '';
+        }
+      });
+    }
+    
+    // Reset Twitter/X
+    if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
+      const reactRoot = document.querySelector('#react-root > div');
+      const mainContent = document.querySelector('main[role="main"]');
+      
+      [reactRoot, mainContent].forEach(element => {
+        if (element) {
+          element.style.width = '';
+          element.style.marginRight = '';
+        }
+      });
+    }
+    
+    // Reset generic containers
+    const genericContainers = document.querySelectorAll('[data-llamb-original-max-width]');
+    genericContainers.forEach(element => {
+      if (element.dataset.llambOriginalMaxWidth) {
+        element.style.maxWidth = element.dataset.llambOriginalMaxWidth;
+        delete element.dataset.llambOriginalMaxWidth;
+      }
+    });
+  }
+  
+  // Handle site-specific layout adjustments
+  function handleSiteSpecificLayout() {
+    const hostname = window.location.hostname.toLowerCase();
+    const sidebarWidth = isVisible ? 380 : 0;
+    
+    // YouTube specific adjustments
+    if (hostname.includes('youtube.com')) {
+      const ytdApp = document.querySelector('ytd-app');
+      const masthead = document.querySelector('#masthead-container');
+      const pageManager = document.querySelector('#page-manager');
+      
+      [ytdApp, masthead, pageManager].forEach(element => {
+        if (element) {
+          if (isVisible) {
+            element.style.width = 'calc(100% - 380px)';
+            element.style.marginRight = '0';
+          } else {
+            element.style.width = '100%';
+            element.style.marginRight = '0';
+          }
+        }
+      });
+    }
+    
+    // Twitter/X specific adjustments
+    if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
+      const reactRoot = document.querySelector('#react-root > div');
+      const mainContent = document.querySelector('main[role="main"]');
+      
+      [reactRoot, mainContent].forEach(element => {
+        if (element) {
+          if (isVisible) {
+            element.style.width = 'calc(100% - 380px)';
+            element.style.marginRight = '0';
+          } else {
+            element.style.width = '100%';
+            element.style.marginRight = '0';
+          }
+        }
+      });
+    }
+    
+    // Generic container adjustments for other sites
+    if (!hostname.includes('youtube.com') && !hostname.includes('twitter.com') && !hostname.includes('x.com')) {
+      const genericContainers = document.querySelectorAll('.container, .wrapper, .main-content, [role="main"]');
+      genericContainers.forEach(element => {
+        // Skip our own sidebar
+        if (element.closest('#llamb-chat-sidebar')) return;
+        
+        if (isVisible && !isFloatingMode) {
+          const currentMaxWidth = window.getComputedStyle(element).maxWidth;
+          if (currentMaxWidth !== 'none' && !element.dataset.llambOriginalMaxWidth) {
+            element.dataset.llambOriginalMaxWidth = currentMaxWidth;
+          }
+          element.style.maxWidth = 'calc(100vw - 380px)';
+        } else {
+          if (element.dataset.llambOriginalMaxWidth) {
+            element.style.maxWidth = element.dataset.llambOriginalMaxWidth;
+            if (!isVisible || isFloatingMode) {
+              delete element.dataset.llambOriginalMaxWidth;
+            }
+          } else {
+            element.style.maxWidth = '';
+          }
+        }
+      });
+    }
   }
 
   // Add selection change listener for real-time updates
@@ -1950,6 +2825,14 @@
       } else if (request.action === 'streamError') {
         // Handle streaming errors
         handleStreamError(request);
+        sendResponse({ success: true });
+      } else if (request.action === 'pluginStateChanged') {
+        // Handle plugin enable/disable from settings page
+        handlePluginStateChanged(request);
+        sendResponse({ success: true });
+      } else if (request.action === 'pageUpdated') {
+        // Handle page navigation updates
+        handlePageUpdated(request);
         sendResponse({ success: true });
       } else {
         sendResponse({ success: false, error: 'Unknown action' });
@@ -2010,6 +2893,45 @@
     document.addEventListener('DOMContentLoaded', initialize);
   } else {
     initialize();
+  }
+
+  // Handle plugin state changes from background script
+  async function handlePluginStateChanged(request) {
+    const { pluginId, enabled } = request;
+    console.log('LlamB: Plugin state changed:', pluginId, enabled ? 'enabled' : 'disabled');
+    
+    if (!pluginManager) {
+      console.warn('LlamB: PluginManager not available, cannot handle state change');
+      return;
+    }
+    
+    try {
+      if (enabled) {
+        await pluginManager.enablePlugin(pluginId);
+        console.log('LlamB: Plugin enabled in content script:', pluginId);
+      } else {
+        await pluginManager.disablePlugin(pluginId);
+        console.log('LlamB: Plugin disabled in content script:', pluginId);
+      }
+      
+      // Trigger a page change to update plugin states
+      await pluginManager.onPageChange();
+    } catch (error) {
+      console.error('LlamB: Error handling plugin state change:', error);
+    }
+  }
+  
+  // Handle page updates
+  async function handlePageUpdated(request) {
+    console.log('LlamB: Page updated, notifying plugins:', request.url);
+    
+    if (pluginManager) {
+      try {
+        await pluginManager.onPageChange();
+      } catch (error) {
+        console.error('LlamB: Error notifying plugins of page update:', error);
+      }
+    }
   }
 
   // Handle window resize to adjust layout
