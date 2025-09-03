@@ -2,6 +2,8 @@
 
 A Chrome extension that provides an AI chat sidebar for any webpage, allowing you to interact with LLMs while having full context of the current page.
 
+https://www.youtube.com/watch?v=C13dLtJSsV8
+
 ## Features
 
 - **Chat Sidebar**: Floating sidebar that appears on any webpage
