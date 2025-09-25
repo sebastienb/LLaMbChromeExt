@@ -42,6 +42,22 @@ The extension features a modular plugin architecture that allows for site-specif
 
 ## Installation
 
+### Before Publishing - Important Configuration
+
+**Before open-sourcing or publishing this extension, make sure to:**
+
+1. **Update GitHub URLs**: Replace `YOUR_USERNAME` with your actual GitHub username in `popup.js`
+2. **Review API Keys**: Ensure no API keys or sensitive data are hardcoded
+3. **Test All Features**: Verify the extension works correctly after the bug fixes
+
+### Debug Logging
+
+The extension now includes a user-configurable debug logging feature:
+- **Default**: Debug logging is **disabled** by default for clean console output
+- **Enable/Disable**: Toggle debug logging in Settings → Global Settings → "Enable debug logging (console)"
+- **No code changes needed**: The setting controls all console logging dynamically
+- **Production ready**: No need to modify any code before publishing
+
 ### Load as Unpacked Extension (Development)
 
 1. **Download or Clone** this repository to your local machine
@@ -188,6 +204,22 @@ The extension has been enhanced to handle Chrome's strict Content Security Polic
 - `storage`: Save user settings and preferences
 - `scripting`: Inject the sidebar into web pages
 - `<all_urls>`: Work on all websites
+
+## Recent Updates & Bug Fixes (v1.0.1)
+
+### New Features
+- **User-Configurable Debug Logging**: Added toggle in settings to control console logging (defaults to OFF)
+  - No more verbose console output by default
+  - Enable/disable debug logs without code changes
+  - Accessible via Settings → Global Settings
+
+### Bug Fixes (v1.0.0)
+- **Fixed missing file references**: Removed non-existent `sidebar.html` and `sidebar.js` from manifest
+- **Fixed undefined DOM elements**: Resolved popup.js errors with missing connectionSelect and connectionStatus
+- **Updated placeholder URLs**: GitHub repository links now use configurable placeholders
+- **Improved error handling**: Added robust error handling for script loading with timeouts
+- **Enhanced storage migration**: Safer migration that doesn't clear all user data
+- **Fixed icon filename**: Renamed incorrectly named icon file
 
 ## Contributing
 

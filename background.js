@@ -3,6 +3,7 @@
 // Import LLM management modules
 try {
   importScripts(
+    'js/debug-logger.js',
     'js/storage-manager.js',
     'js/chat-manager.js',
     'js/stream-parser.js', 
@@ -10,12 +11,12 @@ try {
     'js/llm-manager.js'
   );
   
-  console.log('Background: importScripts completed');
-  console.log('Background: StorageManager available?', typeof StorageManager);
-  console.log('Background: ChatManager available?', typeof ChatManager);
-  console.log('Background: LLMManager available?', typeof LLMManager);
+  debugLogger.logSync('Background: importScripts completed');
+  debugLogger.logSync('Background: StorageManager available?', typeof StorageManager);
+  debugLogger.logSync('Background: ChatManager available?', typeof ChatManager);
+  debugLogger.logSync('Background: LLMManager available?', typeof LLMManager);
 } catch (error) {
-  console.error('Background: Error importing scripts:', error);
+  debugLogger.error('Background: Error importing scripts:', error);
 }
 
 // Initialize managers
@@ -24,7 +25,7 @@ let chatManager;
 
 // Extension installation
 chrome.runtime.onInstalled.addListener(async (details) => {
-  console.log('LlamB Chat Assistant installed');
+  debugLogger.logSync('LlamB Chat Assistant installed');
   
   // Initialize managers
   llmManager = new LLMManager();
@@ -68,12 +69,18 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         enabled: true
       });
       
-      // Clear old settings
-      await chrome.storage.sync.clear();
-      console.log('LlamB: Migrated old settings to new format');
+      // Remove only the old settings keys, not all sync storage
+      await chrome.storage.sync.remove([
+        'sidebarEnabled', 'apiKey', 'selectedModel', 'autoContextCapture'
+      ]);
+      
+      // Mark migration as complete
+      await chrome.storage.local.set({ 'llamb-migration-complete': true });
+      debugLogger.logSync('LlamB: Migrated old settings to new format');
     }
   } catch (error) {
-    console.log('LlamB: No old settings to migrate');
+    debugLogger.error('LlamB: Error during settings migration:', error);
+    // Don't fail installation if migration fails
   }
 });
 
@@ -113,7 +120,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         break;
     }
   } catch (error) {
-    console.log('Context menu action failed:', error);
+    debugLogger.logSync('Context menu action failed:', error);
     
     // For toggle-sidebar, try to inject content script if needed
     if (info.menuItemId === "toggle-sidebar") {
@@ -127,11 +134,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           try {
             await chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
           } catch (e) {
-            console.log('Still could not toggle sidebar:', e);
+            debugLogger.logSync('Still could not toggle sidebar:', e);
           }
         }, 200);
       } catch (injectionError) {
-        console.log('Could not inject content script:', injectionError);
+        debugLogger.logSync('Could not inject content script:', injectionError);
       }
     }
   }
@@ -143,7 +150,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     // Toggle sidebar in the active tab
     await chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
   } catch (error) {
-    console.log('Could not inject sidebar:', error);
+    debugLogger.logSync('Could not inject sidebar:', error);
     
     // Try to inject content script if not already injected
     try {
@@ -157,20 +164,20 @@ chrome.action.onClicked.addListener(async (tab) => {
         try {
           await chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
         } catch (e) {
-          console.log('Still could not toggle sidebar:', e);
+          debugLogger.logSync('Still could not toggle sidebar:', e);
         }
       }, 200);
     } catch (injectionError) {
-      console.log('Could not inject content script:', injectionError);
+      debugLogger.logSync('Could not inject content script:', injectionError);
     }
   }
 });
 
 // Handle messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('Background: Received message:', request.action);
-  console.log('Background: Full request object:', request);
-  console.log('Background: Sender:', sender);
+  debugLogger.logSync('Background: Received message:', request.action);
+  debugLogger.logSync('Background: Full request object:', request);
+  debugLogger.logSync('Background: Sender:', sender);
   
   switch (request.action) {
     case 'getPageContext':
@@ -218,7 +225,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
       
     case 'fetchYoutubeCaptions':
-      console.log('Background: Handling fetchYoutubeCaptions request:', request.captionUrl);
+      debugLogger.logSync('Background: Handling fetchYoutubeCaptions request:', request.captionUrl);
       handleFetchYoutubeCaptions(request.captionUrl, sendResponse);
       return true;
       
@@ -235,7 +242,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return true;
       
     default:
-      console.log('Background: Unknown action:', request.action);
+      debugLogger.logSync('Background: Unknown action:', request.action);
       sendResponse({ success: false, error: 'Unknown action' });
   }
 });
@@ -246,7 +253,7 @@ async function handleGetPageContext(tabId, sendResponse) {
     const response = await chrome.tabs.sendMessage(tabId, { action: 'getPageContext' });
     sendResponse({ success: true, context: response });
   } catch (error) {
-    console.log('Error getting page context:', error);
+    debugLogger.logSync('Error getting page context:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -261,22 +268,22 @@ async function handleChatMessage(request, sender, sendResponse) {
 
     const { message, pageContext, options = {} } = request;
     
-    console.log('Background: Processing chat message:', message);
+    debugLogger.logSync('Background: Processing chat message:', message);
     
     // Send the message and get the result
     const result = await llmManager.sendMessage(message, pageContext, options);
     
-    console.log('Background: LLM result:', result);
+    debugLogger.logSync('Background: LLM result:', result);
     
     // Set up streaming event listeners AFTER getting the requestId
     const requestId = result.requestId;
     
     // Handle streaming responses
     if (options.streaming !== false && result.type === 'streaming') {
-      console.log('Background: Setting up streaming listeners for requestId:', requestId);
+      debugLogger.logSync('Background: Setting up streaming listeners for requestId:', requestId);
       
       const streamChunkHandler = (data) => {
-        console.log('Background: Stream chunk received:', data);
+        debugLogger.logSync('Background: Stream chunk received:', data);
         if (data.requestId === requestId) {
           chrome.tabs.sendMessage(sender.tab.id, {
             action: 'streamChunk',
@@ -285,13 +292,13 @@ async function handleChatMessage(request, sender, sendResponse) {
             blocks: data.blocks,
             fullContent: data.fullContent
           }).catch((error) => {
-            console.log('Background: Failed to send stream chunk:', error);
+            debugLogger.logSync('Background: Failed to send stream chunk:', error);
           });
         }
       };
       
       const streamEndHandler = (data) => {
-        console.log('Background: Stream end received:', data);
+        debugLogger.logSync('Background: Stream end received:', data);
         if (data.requestId === requestId) {
           chrome.tabs.sendMessage(sender.tab.id, {
             action: 'streamEnd',
@@ -299,7 +306,7 @@ async function handleChatMessage(request, sender, sendResponse) {
             fullContent: data.fullContent,
             blocks: data.blocks
           }).catch((error) => {
-            console.log('Background: Failed to send stream end:', error);
+            debugLogger.logSync('Background: Failed to send stream end:', error);
           });
           
           // Clean up event listeners
@@ -310,14 +317,14 @@ async function handleChatMessage(request, sender, sendResponse) {
       };
       
       const streamErrorHandler = (data) => {
-        console.log('Background: Stream error received:', data);
+        debugLogger.logSync('Background: Stream error received:', data);
         if (data.requestId === requestId) {
           chrome.tabs.sendMessage(sender.tab.id, {
             action: 'streamError',
             requestId: data.requestId,
             error: data.error
           }).catch((error) => {
-            console.log('Background: Failed to send stream error:', error);
+            debugLogger.logSync('Background: Failed to send stream error:', error);
           });
           
           // Clean up event listeners
@@ -340,7 +347,7 @@ async function handleChatMessage(request, sender, sendResponse) {
     });
     
   } catch (error) {
-    console.error('Error handling chat message:', error);
+    debugLogger.error('Error handling chat message:', error);
     sendResponse({ 
       success: false, 
       error: error.message,
@@ -366,7 +373,7 @@ async function handleGetConnections(sendResponse) {
       activeConnectionId: activeConnection?.id || null
     });
   } catch (error) {
-    console.error('Error getting connections:', error);
+    debugLogger.error('Error getting connections:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -382,7 +389,7 @@ async function handleSetActiveConnection(connectionId, sendResponse) {
     const connection = await llmManager.setActiveConnection(connectionId);
     sendResponse({ success: true, connection });
   } catch (error) {
-    console.error('Error setting active connection:', error);
+    debugLogger.error('Error setting active connection:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -398,7 +405,7 @@ async function handleTestConnection(connectionData, sendResponse) {
     const result = await llmManager.testConnection(connectionData);
     sendResponse({ success: true, result });
   } catch (error) {
-    console.error('Error testing connection:', error);
+    debugLogger.error('Error testing connection:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -411,7 +418,7 @@ async function handleOpenSettings(sendResponse) {
     });
     sendResponse({ success: true });
   } catch (error) {
-    console.error('Error opening settings:', error);
+    debugLogger.error('Error opening settings:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -448,7 +455,7 @@ async function handleGetCurrentTab(sendResponse) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     sendResponse({ success: true, tab });
   } catch (error) {
-    console.error('Error getting current tab:', error);
+    debugLogger.error('Error getting current tab:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -456,20 +463,20 @@ async function handleGetCurrentTab(sendResponse) {
 // Get chat history
 async function handleGetChatHistory(sendResponse) {
   try {
-    console.log('Background: handleGetChatHistory called');
-    console.log('Background: ChatManager class available?', typeof ChatManager);
-    console.log('Background: Current chatManager instance?', !!chatManager);
+    debugLogger.logSync('Background: handleGetChatHistory called');
+    debugLogger.logSync('Background: ChatManager class available?', typeof ChatManager);
+    debugLogger.logSync('Background: Current chatManager instance?', !!chatManager);
     
     // Always ensure ChatManager is initialized
     if (!chatManager) {
-      console.log('Background: Initializing ChatManager for getChatHistory');
+      debugLogger.logSync('Background: Initializing ChatManager for getChatHistory');
       if (typeof ChatManager === 'undefined') {
-        console.log('Background: ChatManager not found, attempting to reload scripts...');
+        debugLogger.logSync('Background: ChatManager not found, attempting to reload scripts...');
         try {
           importScripts('js/chat-manager.js');
-          console.log('Background: Reloaded chat-manager.js, ChatManager available?', typeof ChatManager);
+          debugLogger.logSync('Background: Reloaded chat-manager.js, ChatManager available?', typeof ChatManager);
         } catch (importError) {
-          console.error('Background: Failed to reload chat-manager.js:', importError);
+          debugLogger.error('Background: Failed to reload chat-manager.js:', importError);
           throw new Error('ChatManager class not available - script import failed');
         }
       }
@@ -479,14 +486,14 @@ async function handleGetChatHistory(sendResponse) {
       }
       
       chatManager = new ChatManager();
-      console.log('Background: ChatManager initialized successfully');
+      debugLogger.logSync('Background: ChatManager initialized successfully');
     }
     
     const chatHistory = await chatManager.getChatHistory();
-    console.log('Background: Retrieved chat history:', chatHistory.length, 'chats');
+    debugLogger.logSync('Background: Retrieved chat history:', chatHistory.length, 'chats');
     sendResponse({ success: true, chatHistory });
   } catch (error) {
-    console.error('Background: Error getting chat history:', error);
+    debugLogger.error('Background: Error getting chat history:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -496,15 +503,15 @@ async function handleLoadChat(chatId, sendResponse) {
   try {
     // Always ensure ChatManager is initialized
     if (!chatManager) {
-      console.log('Background: Initializing ChatManager for loadChat');
+      debugLogger.logSync('Background: Initializing ChatManager for loadChat');
       chatManager = new ChatManager();
     }
     
     const chat = await chatManager.loadChat(chatId);
-    console.log('Background: Loaded chat:', chatId, chat ? 'success' : 'not found');
+    debugLogger.logSync('Background: Loaded chat:', chatId, chat ? 'success' : 'not found');
     sendResponse({ success: true, chat });
   } catch (error) {
-    console.error('Background: Error loading chat:', error);
+    debugLogger.error('Background: Error loading chat:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -514,15 +521,15 @@ async function handleDeleteChat(chatId, sendResponse) {
   try {
     // Always ensure ChatManager is initialized
     if (!chatManager) {
-      console.log('Background: Initializing ChatManager for deleteChat');
+      debugLogger.logSync('Background: Initializing ChatManager for deleteChat');
       chatManager = new ChatManager();
     }
     
     const result = await chatManager.deleteChat(chatId);
-    console.log('Background: Deleted chat:', chatId, result ? 'success' : 'failed');
+    debugLogger.logSync('Background: Deleted chat:', chatId, result ? 'success' : 'failed');
     sendResponse({ success: result });
   } catch (error) {
-    console.error('Background: Error deleting chat:', error);
+    debugLogger.error('Background: Error deleting chat:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -532,15 +539,15 @@ async function handleExportChat(chatId, sendResponse) {
   try {
     // Always ensure ChatManager is initialized
     if (!chatManager) {
-      console.log('Background: Initializing ChatManager for exportChat');
+      debugLogger.logSync('Background: Initializing ChatManager for exportChat');
       chatManager = new ChatManager();
     }
     
     const markdown = await chatManager.exportChatAsMarkdown(chatId);
-    console.log('Background: Exported chat:', chatId, markdown ? 'success' : 'failed');
+    debugLogger.logSync('Background: Exported chat:', chatId, markdown ? 'success' : 'failed');
     sendResponse({ success: true, markdown });
   } catch (error) {
-    console.error('Background: Error exporting chat:', error);
+    debugLogger.error('Background: Error exporting chat:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -548,7 +555,7 @@ async function handleExportChat(chatId, sendResponse) {
 // Fetch YouTube captions from background context to bypass CORS
 async function handleFetchYoutubeCaptions(captionUrl, sendResponse) {
   try {
-    console.log('Background: Fetching YouTube captions from:', captionUrl);
+    debugLogger.logSync('Background: Fetching YouTube captions from:', captionUrl);
     
     const response = await fetch(captionUrl, {
       method: 'GET',
@@ -557,16 +564,16 @@ async function handleFetchYoutubeCaptions(captionUrl, sendResponse) {
       }
     });
     
-    console.log('Background: Caption fetch response status:', response.status);
-    console.log('Background: Response headers:', [...response.headers.entries()]);
+    debugLogger.logSync('Background: Caption fetch response status:', response.status);
+    debugLogger.logSync('Background: Response headers:', [...response.headers.entries()]);
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
     
     const text = await response.text();
-    console.log('Background: Raw response text length:', text.length);
-    console.log('Background: Raw response sample:', text.substring(0, 200));
+    debugLogger.logSync('Background: Raw response text length:', text.length);
+    debugLogger.logSync('Background: Raw response sample:', text.substring(0, 200));
     
     if (!text.trim()) {
       throw new Error('Empty response from caption API');
@@ -574,14 +581,14 @@ async function handleFetchYoutubeCaptions(captionUrl, sendResponse) {
     
     try {
       const captionData = JSON.parse(text);
-      console.log('Background: Successfully parsed caption JSON, events:', captionData.events?.length || 'No events');
+      debugLogger.logSync('Background: Successfully parsed caption JSON, events:', captionData.events?.length || 'No events');
       sendResponse({ 
         success: true, 
         data: captionData,
         rawLength: text.length 
       });
     } catch (parseError) {
-      console.error('Background: Failed to parse caption response as JSON:', parseError.message);
+      debugLogger.error('Background: Failed to parse caption response as JSON:', parseError.message);
       sendResponse({ 
         success: false, 
         error: `JSON parse error: ${parseError.message}`,
@@ -590,7 +597,7 @@ async function handleFetchYoutubeCaptions(captionUrl, sendResponse) {
     }
     
   } catch (error) {
-    console.error('Background: Error fetching YouTube captions:', error);
+    debugLogger.error('Background: Error fetching YouTube captions:', error);
     sendResponse({ 
       success: false, 
       error: error.message 
@@ -617,7 +624,7 @@ async function handleGetAvailablePlugins(sendResponse) {
     
     sendResponse({ success: true, plugins });
   } catch (error) {
-    console.error('Background: Error getting available plugins:', error);
+    debugLogger.error('Background: Error getting available plugins:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -625,7 +632,7 @@ async function handleGetAvailablePlugins(sendResponse) {
 // Enable a plugin
 async function handleEnablePlugin(pluginId, sendResponse) {
   try {
-    console.log('Background: Enabling plugin:', pluginId);
+    debugLogger.logSync('Background: Enabling plugin:', pluginId);
     
     // Get current plugin settings
     const result = await chrome.storage.local.get('llamb-plugin-settings');
@@ -653,10 +660,10 @@ async function handleEnablePlugin(pluginId, sendResponse) {
       }
     }
     
-    console.log('Background: Plugin enabled successfully:', pluginId);
+    debugLogger.logSync('Background: Plugin enabled successfully:', pluginId);
     sendResponse({ success: true });
   } catch (error) {
-    console.error('Background: Error enabling plugin:', error);
+    debugLogger.error('Background: Error enabling plugin:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
@@ -664,7 +671,7 @@ async function handleEnablePlugin(pluginId, sendResponse) {
 // Disable a plugin
 async function handleDisablePlugin(pluginId, sendResponse) {
   try {
-    console.log('Background: Disabling plugin:', pluginId);
+    debugLogger.logSync('Background: Disabling plugin:', pluginId);
     
     // Get current plugin settings
     const result = await chrome.storage.local.get('llamb-plugin-settings');
@@ -690,12 +697,12 @@ async function handleDisablePlugin(pluginId, sendResponse) {
       }
     }
     
-    console.log('Background: Plugin disabled successfully:', pluginId);
+    debugLogger.logSync('Background: Plugin disabled successfully:', pluginId);
     sendResponse({ success: true });
   } catch (error) {
-    console.error('Background: Error disabling plugin:', error);
+    debugLogger.error('Background: Error disabling plugin:', error);
     sendResponse({ success: false, error: error.message });
   }
 }
 
-console.log('LlamB Background Script Loaded with LLM Integration');
+debugLogger.logSync('LlamB Background Script Loaded with LLM Integration');

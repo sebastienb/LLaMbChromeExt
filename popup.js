@@ -1,6 +1,21 @@
 // Popup script for LlamB Chrome Extension
 document.addEventListener('DOMContentLoaded', async () => {
   
+  // Create local debug logger that checks settings
+  let debugEnabled = false;
+  
+  // Load debug setting from storage
+  chrome.storage.local.get('llamb-settings', (result) => {
+    const settings = result['llamb-settings'] || {};
+    debugEnabled = settings.globalSettings?.debugLogging === true;
+  });
+  
+  // Debug logging functions
+  const debugLog = (...args) => {
+    if (debugEnabled) debugLog('[LlamB Popup]', ...args);
+  };
+  const debugError = (...args) => debugError('[LlamB Popup]', ...args);
+  
   // Detect if we're running in a popup window vs extension popup
   const isStandaloneWindow = window.location.href.includes('popup.html') && !chrome.extension.getViews({ type: 'popup' }).includes(window);
   
@@ -13,19 +28,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Check for our custom StorageManager class - try different approaches
       if (typeof window.StorageManager !== 'undefined') {
         storageManager = new window.StorageManager();
-        console.log('Window StorageManager initialized successfully');
+        debugLog('Window StorageManager initialized successfully');
         return true;
       } else if (typeof StorageManager !== 'undefined') {
         // Check if this is our StorageManager by checking for custom methods
         const testInstance = new StorageManager();
         if (testInstance.storageKey && testInstance.sidebarStateKey) {
           storageManager = testInstance;
-          console.log('Custom StorageManager initialized successfully');
+          debugLog('Custom StorageManager initialized successfully');
           return true;
         }
       }
     } catch (error) {
-      console.error('Error initializing StorageManager:', error);
+      debugError('Error initializing StorageManager:', error);
     }
     return false;
   }
@@ -35,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // If not available, wait for script to load
     setTimeout(() => {
       if (!initStorageManager()) {
-        console.warn('StorageManager not available, some features may not work');
+        debugLog('StorageManager not available, some features may not work');
         // Create a minimal fallback
         storageManager = {
           getQuickActions: async () => [],
@@ -69,7 +84,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadQuickActions(); // Refresh the list
         showNotification('Action deleted');
       } catch (error) {
-        console.error('Error deleting action:', error);
+        debugError('Error deleting action:', error);
         showNotification('Failed to delete action');
       }
     }
@@ -92,7 +107,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadQuickActions();
         showNotification('Default actions restored');
       } catch (error) {
-        console.error('Error restoring defaults:', error);
+        debugError('Error restoring defaults:', error);
         showNotification('Failed to restore defaults');
       }
     }
@@ -105,65 +120,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadPlugins();
   }, 200);
 
-  // Load connections from background
+  // Load connections from background (original version - kept for compatibility)
   async function loadConnections() {
     try {
       const response = await chrome.runtime.sendMessage({ action: 'getLLMConnections' });
       
       if (response.success) {
-        populateConnectionSelect(response.connections, response.activeConnectionId);
-        updateConnectionStatus(response.connections, response.activeConnectionId);
+        // Note: populateConnectionSelect removed as the UI elements don't exist
+        // Using the new card-based system instead (see renderConnectionsList below)
+        // updateConnectionStatus(response.connections, response.activeConnectionId);
       } else {
-        console.error('Failed to load connections:', response.error);
-        updateConnectionStatus([], null);
+        debugError('Failed to load connections:', response.error);
+        // updateConnectionStatus([], null);
       }
     } catch (error) {
-      console.error('Error loading connections:', error);
-      updateConnectionStatus([], null);
-    }
-  }
-
-  // Populate connection dropdown
-  function populateConnectionSelect(connections, activeConnectionId) {
-    connectionSelect.innerHTML = '';
-    
-    if (connections.length === 0) {
-      connectionSelect.innerHTML = '<option value="">No connections configured</option>';
-      connectionSelect.disabled = true;
-      return;
-    }
-
-    connectionSelect.disabled = false;
-    
-    connections.forEach(connection => {
-      const option = document.createElement('option');
-      option.value = connection.id;
-      option.textContent = `${connection.name} (${connection.model})`;
-      option.selected = connection.id === activeConnectionId;
-      connectionSelect.appendChild(option);
-    });
-  }
-
-  // Change active connection
-  async function changeActiveConnection() {
-    const connectionId = connectionSelect.value;
-    if (!connectionId) return;
-
-    try {
-      const response = await chrome.runtime.sendMessage({
-        action: 'setActiveConnection',
-        connectionId: connectionId
-      });
-
-      if (response.success) {
-        updateConnectionStatus([response.connection], connectionId);
-        showNotification('Active connection updated');
-      } else {
-        showNotification('Failed to update connection');
-      }
-    } catch (error) {
-      console.error('Error changing active connection:', error);
-      showNotification('Error updating connection');
+      debugError('Error loading connections:', error);
+      // updateConnectionStatus([], null);
     }
   }
 
@@ -175,7 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.close();
       }
     } catch (error) {
-      console.error('Error opening settings:', error);
+      debugError('Error opening settings:', error);
       showNotification('Could not open settings');
     }
   }
@@ -190,11 +162,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
-      console.log('LlamB: Attempting to toggle sidebar on tab:', tab.id);
+      debugLog('LlamB: Attempting to toggle sidebar on tab:', tab.id);
       
       try {
         const response = await chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
-        console.log('LlamB: Toggle response:', response);
+        debugLog('LlamB: Toggle response:', response);
         
         if (response && response.success) {
           if (!isStandaloneWindow) {
@@ -206,7 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           throw new Error(response?.error || 'Unknown error');
         }
       } catch (messageError) {
-        console.log('LlamB: Content script not responding, trying to inject...');
+        debugLog('LlamB: Content script not responding, trying to inject...');
         
         // Try to inject content script
         await chrome.scripting.executeScript({
@@ -218,7 +190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(async () => {
           try {
             const retryResponse = await chrome.tabs.sendMessage(tab.id, { action: 'toggleSidebar' });
-            console.log('LlamB: Retry response:', retryResponse);
+            debugLog('LlamB: Retry response:', retryResponse);
             
             if (retryResponse && retryResponse.success) {
               if (!isStandaloneWindow) {
@@ -230,38 +202,24 @@ document.addEventListener('DOMContentLoaded', async () => {
               throw new Error('Retry failed');
             }
           } catch (retryError) {
-            console.error('LlamB: Retry failed:', retryError);
+            debugError('LlamB: Retry failed:', retryError);
             showNotification('Could not toggle sidebar. Try refreshing the page.');
           }
         }, 500);
       }
     } catch (error) {
-      console.error('LlamB: Error in toggleSidebar:', error);
+      debugError('LlamB: Error in toggleSidebar:', error);
       showNotification(`Error: ${error.message}`);
     }
   }
 
 
-  // Update connection status indicator
+  // Update connection status indicator (removed - UI elements don't exist)
+  // This functionality is now handled by the card-based system
   function updateConnectionStatus(connections, activeConnectionId) {
-    const statusText = connectionStatus.querySelector('span');
-    
-    if (connections.length === 0) {
-      connectionStatus.className = 'status-indicator disconnected';
-      statusText.textContent = 'No connections configured';
-    } else if (activeConnectionId) {
-      const activeConnection = connections.find(c => c.id === activeConnectionId);
-      if (activeConnection && activeConnection.enabled) {
-        connectionStatus.className = 'status-indicator';
-        statusText.textContent = `Connected: ${activeConnection.name}`;
-      } else {
-        connectionStatus.className = 'status-indicator disconnected';
-        statusText.textContent = 'Active connection disabled';
-      }
-    } else {
-      connectionStatus.className = 'status-indicator disconnected';
-      statusText.textContent = 'No active connection';
-    }
+    // Deprecated: connectionStatus element doesn't exist in current UI
+    // Status is now shown in the connection cards themselves
+    return;
   }
 
   // Show notification
@@ -307,13 +265,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   async function loadQuickActions() {
     try {
       if (!storageManager) {
-        console.log('StorageManager not available, skipping quick actions');
+        debugLog('StorageManager not available, skipping quick actions');
         return;
       }
       const quickActions = await storageManager.getQuickActions();
       renderActionsList(quickActions);
     } catch (error) {
-      console.error('Error loading quick actions:', error);
+      debugError('Error loading quick actions:', error);
       // Don't show notification for this, as it's not critical
     }
   }
@@ -392,7 +350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .replace(/{pageContent}/g, response.content || 'No content available')
             .replace(/{selectedText}/g, response.selectedText || 'No text selected');
         } catch (error) {
-          console.log('Could not get page context:', error);
+          debugLog('Could not get page context:', error);
           showNotification('Could not get page context. Try refreshing the page.');
           return;
         }
@@ -414,7 +372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.close();
       }
     } catch (error) {
-      console.error('Error executing quick action:', error);
+      debugError('Error executing quick action:', error);
       showNotification('Could not execute action. Try refreshing the page.');
     }
   }
@@ -475,7 +433,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('action-use-context').checked = action.usePageContext;
       }
     } catch (error) {
-      console.error('Error loading action for editing:', error);
+      debugError('Error loading action for editing:', error);
       showNotification('Failed to load action');
     }
   }
@@ -511,7 +469,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('action-editor-modal').classList.remove('active');
       loadQuickActions();
     } catch (error) {
-      console.error('Error saving action:', error);
+      debugError('Error saving action:', error);
       showNotification('Failed to save action');
     }
   }
@@ -528,7 +486,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadQuickActions();
         showNotification('Action deleted');
       } catch (error) {
-        console.error('Error deleting action:', error);
+        debugError('Error deleting action:', error);
         showNotification('Failed to delete action');
       }
     }
@@ -543,7 +501,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load plugins from background
   async function loadPlugins() {
     try {
-      console.log('Loading plugins...');
+      debugLog('Loading plugins...');
       
       // Show loading state
       pluginsList.innerHTML = `
@@ -554,19 +512,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
 
       const response = await chrome.runtime.sendMessage({ action: 'getAvailablePlugins' });
-      console.log('Plugin response:', response);
+      debugLog('Plugin response:', response);
       
       if (response && response.success && response.plugins) {
         const pluginSettings = await getPluginSettings();
-        console.log('Plugin settings:', pluginSettings);
+        debugLog('Plugin settings:', pluginSettings);
         populatePluginsList(response.plugins, pluginSettings);
       } else {
-        console.error('Failed to load plugins:', response?.error);
+        debugError('Failed to load plugins:', response?.error);
         
         // Fallback - show YouTube plugin directly since background might not respond
-        console.log('Using fallback plugin list');
+        debugLog('Using fallback plugin list');
         const pluginSettings = await getPluginSettings();
-        console.log('Fallback plugin settings:', pluginSettings);
+        debugLog('Fallback plugin settings:', pluginSettings);
         
         const fallbackPlugins = [{
           id: 'youtube-captions',
@@ -581,7 +539,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         populatePluginsList(fallbackPlugins, pluginSettings);
       }
     } catch (error) {
-      console.error('Error loading plugins:', error);
+      debugError('Error loading plugins:', error);
       
       // Try fallback even on error
       try {
@@ -629,7 +587,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         plugins: settings.plugins || {}
       };
     } catch (error) {
-      console.error('Error loading plugin settings:', error);
+      debugError('Error loading plugin settings:', error);
       return { enabled: [], plugins: {} };
     }
   }
@@ -729,7 +687,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showNotification(`Failed to ${isEnabled ? 'enable' : 'disable'} plugin`);
       }
     } catch (error) {
-      console.error('Error toggling plugin:', error);
+      debugError('Error toggling plugin:', error);
       // Revert the toggle
       event.target.checked = !isEnabled;
       showNotification('Failed to update plugin settings');
@@ -752,15 +710,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Tab system setup
   function setupTabSystem() {
-    console.log('Setting up tab system...');
+    debugLog('Setting up tab system...');
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    console.log('Found', tabButtons.length, 'tab buttons and', tabContents.length, 'tab contents');
+    debugLog('Found', tabButtons.length, 'tab buttons and', tabContents.length, 'tab contents');
 
     tabButtons.forEach(button => {
       button.addEventListener('click', (e) => {
-        console.log('Tab button clicked:', button.dataset.tab);
+        debugLog('Tab button clicked:', button.dataset.tab);
         const targetTab = button.dataset.tab;
         
         // Update active tab button
@@ -772,7 +730,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           content.classList.remove('active');
           if (content.id === `${targetTab}-tab`) {
             content.classList.add('active');
-            console.log('Activated tab content:', content.id);
+            debugLog('Activated tab content:', content.id);
           }
         });
 
@@ -780,7 +738,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
           localStorage.setItem('llamb-popup-active-tab', targetTab);
         } catch (error) {
-          console.error('Error saving tab state:', error);
+          debugError('Error saving tab state:', error);
         }
       });
     });
@@ -788,23 +746,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Restore last active tab
     try {
       const lastActiveTab = localStorage.getItem('llamb-popup-active-tab');
-      console.log('Last active tab from storage:', lastActiveTab);
+      debugLog('Last active tab from storage:', lastActiveTab);
       if (lastActiveTab) {
         const tabButton = document.querySelector(`[data-tab="${lastActiveTab}"]`);
         if (tabButton) {
-          console.log('Restoring tab:', lastActiveTab);
+          debugLog('Restoring tab:', lastActiveTab);
           tabButton.click();
         }
       }
     } catch (error) {
-      console.error('Error restoring tab state:', error);
+      debugError('Error restoring tab state:', error);
     }
   }
 
   // Handle footer link clicks
   document.getElementById('help-link').addEventListener('click', (e) => {
     e.preventDefault();
-    chrome.tabs.create({ url: 'https://github.com/yourusername/llamb-extension' });
+    chrome.tabs.create({ url: 'https://github.com/YOUR_USERNAME/LlambBrowserExt' });
   });
 
   document.getElementById('settings-link').addEventListener('click', (e) => {
@@ -815,7 +773,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('feedback-link').addEventListener('click', (e) => {
     e.preventDefault();
-    chrome.tabs.create({ url: 'https://github.com/yourusername/llamb-extension/issues' });
+    chrome.tabs.create({ url: 'https://github.com/YOUR_USERNAME/LlambBrowserExt/issues' });
   });
 
   // Make loadPlugins globally accessible for retry button
@@ -832,11 +790,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response.success) {
         renderConnectionsList(response.connections, response.activeConnectionId);
       } else {
-        console.error('Failed to load connections:', response.error);
+        debugError('Failed to load connections:', response.error);
         showConnectionsEmpty();
       }
     } catch (error) {
-      console.error('Error loading connections:', error);
+      debugError('Error loading connections:', error);
       showConnectionsEmpty();
     }
   };
@@ -929,7 +887,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         showNotification('Failed to activate connection');
       }
     } catch (error) {
-      console.error('Error changing connection:', error);
+      debugError('Error changing connection:', error);
       showNotification('Error changing connection');
     }
   }

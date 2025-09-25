@@ -44,8 +44,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "sidebar.html", 
-        "sidebar.js",
         "settings.html",
         "js/storage-manager.js",
         "js/chat-manager.js",

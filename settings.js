@@ -25,6 +25,7 @@ class SettingsManager {
       document.getElementById('auto-context').checked = global.autoContextCapture !== false;
       document.getElementById('streaming-enabled').checked = global.streamingEnabled !== false;
       document.getElementById('show-thinking').checked = global.showThinkingBlocks !== false;
+      document.getElementById('debug-logging').checked = global.debugLogging === true;
     } catch (error) {
       this.showToast('Failed to load settings', 'error');
     }
@@ -39,7 +40,8 @@ class SettingsManager {
         temperature: parseFloat(document.getElementById('temperature').value),
         autoContextCapture: document.getElementById('auto-context').checked,
         streamingEnabled: document.getElementById('streaming-enabled').checked,
-        showThinkingBlocks: document.getElementById('show-thinking').checked
+        showThinkingBlocks: document.getElementById('show-thinking').checked,
+        debugLogging: document.getElementById('debug-logging').checked
       };
 
       await this.storageManager.updateGlobalSettings(globalSettings);
@@ -58,6 +60,7 @@ class SettingsManager {
     document.getElementById('auto-context').addEventListener('change', () => this.saveGlobalSettings());
     document.getElementById('streaming-enabled').addEventListener('change', () => this.saveGlobalSettings());
     document.getElementById('show-thinking').addEventListener('change', () => this.saveGlobalSettings());
+    document.getElementById('debug-logging').addEventListener('change', () => this.saveGlobalSettings());
 
     // Connection management
     document.getElementById('add-connection-btn').addEventListener('click', () => this.openConnectionModal());

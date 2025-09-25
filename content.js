@@ -2,6 +2,34 @@
 (function() {
   'use strict';
 
+  // Create local debug logger that checks settings
+  let debugEnabled = false;
+  
+  // Load debug setting from storage
+  chrome.storage.local.get('llamb-settings', (result) => {
+    const settings = result['llamb-settings'] || {};
+    debugEnabled = settings.globalSettings?.debugLogging === true;
+  });
+  
+  // Listen for setting changes
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes['llamb-settings']) {
+      const newSettings = changes['llamb-settings'].newValue;
+      if (newSettings?.globalSettings?.debugLogging !== undefined) {
+        debugEnabled = newSettings.globalSettings.debugLogging;
+      }
+    }
+  });
+  
+  // Debug logging functions
+  const debugLog = (...args) => {
+    if (debugEnabled) debugLog('[LlamB]', ...args);
+  };
+  const debugError = (...args) => debugError('[LlamB]', ...args); // Always show errors
+  const debugWarn = (...args) => {
+    if (debugEnabled) debugWarn('[LlamB]', ...args);
+  };
+
   // Prevent multiple injections
   if (window.llambChatInjected) {
     return;
@@ -34,53 +62,73 @@
 
   // Load required scripts
   async function loadRequiredScripts() {
+    const scriptsToLoad = [];
+    
     try {
       // Load StorageManager - but check if it's already available and working
       if (typeof StorageManager === 'undefined' || !StorageManager.prototype.getSidebarState) {
-        const storageScript = document.createElement('script');
-        storageScript.src = chrome.runtime.getURL('js/storage-manager.js');
-        document.head.appendChild(storageScript);
-        await new Promise((resolve, reject) => {
-          storageScript.onload = resolve;
-          storageScript.onerror = reject;
+        scriptsToLoad.push({
+          name: 'StorageManager',
+          src: 'js/storage-manager.js'
         });
       }
       
       // Load ChatManager
       if (typeof ChatManager === 'undefined') {
-        console.log('LlamB: Loading ChatManager script...');
-        const chatScript = document.createElement('script');
-        chatScript.src = chrome.runtime.getURL('js/chat-manager.js');
-        document.head.appendChild(chatScript);
-        await new Promise((resolve, reject) => {
-          chatScript.onload = () => {
-            console.log('LlamB: ChatManager script loaded, checking availability...');
-            // Give the script time to execute
-            setTimeout(() => {
-              console.log('LlamB: ChatManager type after load:', typeof ChatManager);
-              resolve();
-            }, 100);
-          };
-          chatScript.onerror = (error) => {
-            console.error('LlamB: Failed to load ChatManager script:', error);
-            reject(error);
-          };
+        scriptsToLoad.push({
+          name: 'ChatManager',
+          src: 'js/chat-manager.js'
         });
       }
       
-      // Plugin classes should be loaded by manifest.json content_scripts
-      console.log('LlamB: Checking for plugin classes loaded by manifest...');
-      console.log('LlamB: LlambPluginBase available:', typeof LlambPluginBase);
-      console.log('LlamB: PluginManager available:', typeof PluginManager);
-      console.log('LlamB: YoutubeCaptionsPlugin available:', typeof YoutubeCaptionsPlugin);
+      // Load scripts with proper error handling
+      for (const scriptInfo of scriptsToLoad) {
+        try {
+          debugLog(`LlamB: Loading ${scriptInfo.name} script...`);
+          const script = document.createElement('script');
+          script.src = chrome.runtime.getURL(scriptInfo.src);
+          
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error(`${scriptInfo.name} script load timeout`));
+            }, 5000); // 5 second timeout
+            
+            script.onload = () => {
+              clearTimeout(timeout);
+              // Give the script time to execute
+              setTimeout(() => {
+                debugLog(`LlamB: ${scriptInfo.name} loaded successfully`);
+                resolve();
+              }, 100);
+            };
+            
+            script.onerror = (error) => {
+              clearTimeout(timeout);
+              reject(new Error(`Failed to load ${scriptInfo.name}: ${error}`));
+            };
+            
+            document.head.appendChild(script);
+          });
+        } catch (scriptError) {
+          debugError(`LlamB: Error loading ${scriptInfo.name}:`, scriptError);
+          // Continue loading other scripts even if one fails
+        }
+      }
       
-      console.log('LlamB: Required scripts loaded');
-      console.log('LlamB: StorageManager available:', typeof StorageManager);
-      console.log('LlamB: ChatManager available:', typeof ChatManager);
-      console.log('LlamB: PluginManager available:', typeof PluginManager);
-      console.log('LlamB: LlambPluginBase available:', typeof LlambPluginBase);
+      // Plugin classes should be loaded by manifest.json content_scripts
+      debugLog('LlamB: Checking for plugin classes loaded by manifest...');
+      debugLog('LlamB: LlambPluginBase available:', typeof LlambPluginBase);
+      debugLog('LlamB: PluginManager available:', typeof PluginManager);
+      debugLog('LlamB: YoutubeCaptionsPlugin available:', typeof YoutubeCaptionsPlugin);
+      
+      debugLog('LlamB: Required scripts loaded');
+      debugLog('LlamB: StorageManager available:', typeof StorageManager);
+      debugLog('LlamB: ChatManager available:', typeof ChatManager);
+      debugLog('LlamB: PluginManager available:', typeof PluginManager);
+      debugLog('LlamB: LlambPluginBase available:', typeof LlambPluginBase);
     } catch (error) {
-      console.error('LlamB: Error loading scripts:', error);
+      debugError('LlamB: Critical error loading scripts:', error);
+      // Extension can still work with reduced functionality
     }
   }
 
@@ -90,32 +138,32 @@
       await loadRequiredScripts();
       
       // Get current tab ID
-      console.log('LlamB: Requesting current tab from background...');
+      debugLog('LlamB: Requesting current tab from background...');
       const response = await chrome.runtime.sendMessage({ action: 'getCurrentTab' });
-      console.log('LlamB: getCurrentTab response:', response);
+      debugLog('LlamB: getCurrentTab response:', response);
       
       if (response && response.success && response.tab) {
         tabId = response.tab.id;
-        console.log('LlamB: Got tabId from background:', tabId);
+        debugLog('LlamB: Got tabId from background:', tabId);
       } else {
         // Fallback: try to get tab info directly if possible
-        console.log('LlamB: Background getCurrentTab failed, trying fallback...');
+        debugLog('LlamB: Background getCurrentTab failed, trying fallback...');
         tabId = Math.floor(Math.random() * 1000000); // Generate a session ID as fallback
-        console.log('LlamB: Using fallback tabId:', tabId);
+        debugLog('LlamB: Using fallback tabId:', tabId);
       }
       
       // Initialize managers with error handling
       if (typeof window.ChatManager === 'function') {
         try {
           chatManager = new window.ChatManager();
-          console.log('LlamB: ChatManager initialized successfully');
+          debugLog('LlamB: ChatManager initialized successfully');
         } catch (error) {
-          console.error('LlamB: Error creating ChatManager:', error);
+          debugError('LlamB: Error creating ChatManager:', error);
           chatManager = null;
         }
       } else {
-        console.warn('LlamB: ChatManager class not available');
-        console.log('LlamB: window.ChatManager type:', typeof window.ChatManager);
+        debugWarn('LlamB: ChatManager class not available');
+        debugLog('LlamB: window.ChatManager type:', typeof window.ChatManager);
       }
       
       // Initialize PluginManager
@@ -123,22 +171,22 @@
         try {
           pluginManager = new PluginManager();
           await pluginManager.initialize();
-          console.log('LlamB: PluginManager initialized successfully');
+          debugLog('LlamB: PluginManager initialized successfully');
           
           // Plugin enablement is now managed through settings
-          console.log('LlamB: PluginManager will load enabled plugins from storage');
+          debugLog('LlamB: PluginManager will load enabled plugins from storage');
           
           // Notify plugins of current page
-          console.log('LlamB: Notifying plugins of page change...');
+          debugLog('LlamB: Notifying plugins of page change...');
           await pluginManager.onPageChange();
         } catch (error) {
-          console.error('LlamB: Error creating PluginManager:', error);
+          debugError('LlamB: Error creating PluginManager:', error);
           pluginManager = null;
         }
       } else {
-        console.warn('LlamB: PluginManager class not available');
-        console.log('LlamB: typeof PluginManager:', typeof PluginManager);
-        console.log('LlamB: typeof window.PluginManager:', typeof window.PluginManager);
+        debugWarn('LlamB: PluginManager class not available');
+        debugLog('LlamB: typeof PluginManager:', typeof PluginManager);
+        debugLog('LlamB: typeof window.PluginManager:', typeof window.PluginManager);
       }
       
       if (typeof StorageManager !== 'undefined') {
@@ -146,43 +194,43 @@
           // Check if StorageManager has our custom methods
           if (StorageManager.prototype.getSidebarState) {
             storageManager = new StorageManager();
-            console.log('LlamB: StorageManager initialized successfully');
+            debugLog('LlamB: StorageManager initialized successfully');
           } else {
-            console.warn('LlamB: StorageManager exists but missing custom methods, skipping');
+            debugWarn('LlamB: StorageManager exists but missing custom methods, skipping');
             storageManager = null;
           }
         } catch (error) {
-          console.error('LlamB: Error creating StorageManager:', error);
-          console.log('LlamB: Trying to use basic functionality without custom StorageManager');
+          debugError('LlamB: Error creating StorageManager:', error);
+          debugLog('LlamB: Trying to use basic functionality without custom StorageManager');
           storageManager = null;
         }
       } else {
-        console.warn('LlamB: StorageManager class not available');
+        debugWarn('LlamB: StorageManager class not available');
       }
       
-      console.log('LlamB: Managers initialized, tabId:', tabId);
-      console.log('LlamB: ChatManager ready:', !!chatManager);
-      console.log('LlamB: StorageManager ready:', !!storageManager);
+      debugLog('LlamB: Managers initialized, tabId:', tabId);
+      debugLog('LlamB: ChatManager ready:', !!chatManager);
+      debugLog('LlamB: StorageManager ready:', !!storageManager);
     } catch (error) {
-      console.error('LlamB: Error initializing managers:', error);
+      debugError('LlamB: Error initializing managers:', error);
     }
   }
 
   // Restore sidebar state from storage
   async function restoreSidebarState() {
     if (!tabId) {
-      console.log('LlamB: No tabId available for state restoration');
+      debugLog('LlamB: No tabId available for state restoration');
       return;
     }
     
     if (!storageManager) {
-      console.log('LlamB: No storageManager available, skipping state restoration');
+      debugLog('LlamB: No storageManager available, skipping state restoration');
       return;
     }
     
     try {
       const sidebarState = await storageManager.getSidebarState(tabId);
-      console.log('LlamB: Restored sidebar state:', sidebarState);
+      debugLog('LlamB: Restored sidebar state:', sidebarState);
       
       // Handle both old and new state formats
       const stateIsVisible = sidebarState.isVisible || sidebarState;
@@ -214,7 +262,7 @@
         }
       }
     } catch (error) {
-      console.error('LlamB: Error restoring sidebar state:', error);
+      debugError('LlamB: Error restoring sidebar state:', error);
     }
   }
 
@@ -225,18 +273,18 @@
       localStorage.setItem('llamb-mode-preference', isFloatingMode ? 'floating' : 'sidebar');
       localStorage.setItem('llamb-floating-position', JSON.stringify(floatingPosition));
       localStorage.setItem('llamb-floating-size', JSON.stringify(floatingSize));
-      console.log('LlamB: Saved mode preference:', isFloatingMode ? 'floating' : 'sidebar');
+      debugLog('LlamB: Saved mode preference:', isFloatingMode ? 'floating' : 'sidebar');
     } catch (e) {
-      console.error('LlamB: Error saving to localStorage:', e);
+      debugError('LlamB: Error saving to localStorage:', e);
     }
     
     if (!tabId) {
-      console.log('LlamB: No tabId available for state saving');
+      debugLog('LlamB: No tabId available for state saving');
       return;
     }
     
     if (!storageManager) {
-      console.log('LlamB: No storageManager available, skipping state save');
+      debugLog('LlamB: No storageManager available, skipping state save');
       return;
     }
     
@@ -251,7 +299,7 @@
       };
       await storageManager.setSidebarState(tabId, state);
     } catch (error) {
-      console.error('LlamB: Error saving sidebar state:', error);
+      debugError('LlamB: Error saving sidebar state:', error);
     }
   }
 
@@ -262,7 +310,7 @@
     try {
       const chat = await chatManager.loadChat(chatId);
       if (!chat) {
-        console.warn('LlamB: Chat not found:', chatId);
+        debugWarn('LlamB: Chat not found:', chatId);
         return;
       }
       
@@ -289,9 +337,9 @@
         suggestedActions.classList.add('hidden');
       }
       
-      console.log('LlamB: Loaded chat:', chatId);
+      debugLog('LlamB: Loaded chat:', chatId);
     } catch (error) {
-      console.error('LlamB: Error loading chat:', error);
+      debugError('LlamB: Error loading chat:', error);
     }
   }
 
@@ -304,10 +352,10 @@
       currentChat = chat;
       chatManager.setActiveChat(chat);
       
-      console.log('LlamB: Created new chat:', chat.id);
+      debugLog('LlamB: Created new chat:', chat.id);
       return chat;
     } catch (error) {
-      console.error('LlamB: Error creating new chat:', error);
+      debugError('LlamB: Error creating new chat:', error);
       return null;
     }
   }
@@ -458,7 +506,7 @@
       renderChipModalContent(contentElement, content, metadata, chipType);
       
     } catch (error) {
-      console.error('LlamB: Error loading chip content:', error);
+      debugError('LlamB: Error loading chip content:', error);
       contentElement.innerHTML = '<div class="llamb-error">Failed to load content: ' + error.message + '</div>';
     }
   }
@@ -625,9 +673,9 @@
     try {
       historyList.innerHTML = '<div class="llamb-loading">Loading chat history...</div>';
       
-      console.log('LlamB: Requesting chat history from background...');
+      debugLog('LlamB: Requesting chat history from background...');
       const response = await chrome.runtime.sendMessage({ action: 'getChatHistory' });
-      console.log('LlamB: Chat history response:', response);
+      debugLog('LlamB: Chat history response:', response);
       
       if (!response) {
         throw new Error('No response from background script');
@@ -635,12 +683,12 @@
       
       if (!response.success) {
         // Try direct storage access as fallback
-        console.log('LlamB: Background failed, trying direct storage access...');
+        debugLog('LlamB: Background failed, trying direct storage access...');
         try {
           const result = await chrome.storage.local.get('llamb-chats');
           const chats = result['llamb-chats'] || [];
           cachedChatHistory = chats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-          console.log('LlamB: Loaded', cachedChatHistory.length, 'chats from direct storage');
+          debugLog('LlamB: Loaded', cachedChatHistory.length, 'chats from direct storage');
           renderChatHistory(cachedChatHistory);
           return;
         } catch (directError) {
@@ -649,11 +697,11 @@
       }
       
       cachedChatHistory = response.chatHistory || [];
-      console.log('LlamB: Loaded', cachedChatHistory.length, 'chats from background');
+      debugLog('LlamB: Loaded', cachedChatHistory.length, 'chats from background');
       renderChatHistory(cachedChatHistory);
       
     } catch (error) {
-      console.error('LlamB: Error loading chat history:', error);
+      debugError('LlamB: Error loading chat history:', error);
       historyList.innerHTML = `<div class="llamb-error">Failed to load chat history<br><small>${error.message}</small></div>`;
     }
   }
@@ -756,7 +804,7 @@
         await loadChat(chatId);
       } else {
         // Fallback: request chat from background script
-        console.log('LlamB: No ChatManager, requesting chat from background...');
+        debugLog('LlamB: No ChatManager, requesting chat from background...');
         const response = await chrome.runtime.sendMessage({ action: 'loadChat', chatId: chatId });
         
         if (response && response.success && response.chat) {
@@ -788,9 +836,9 @@
       }
       
       hideHistoryDropdown();
-      console.log('LlamB: Loaded chat from history:', chatId);
+      debugLog('LlamB: Loaded chat from history:', chatId);
     } catch (error) {
-      console.error('LlamB: Error loading chat from history:', error);
+      debugError('LlamB: Error loading chat from history:', error);
       alert('Failed to load chat: ' + error.message);
     }
   }
@@ -823,12 +871,12 @@
           clearChat();
         }
         
-        console.log('LlamB: Deleted chat from history:', chatId);
+        debugLog('LlamB: Deleted chat from history:', chatId);
       } else {
         throw new Error(response.error || 'Failed to delete chat');
       }
     } catch (error) {
-      console.error('LlamB: Error deleting chat from history:', error);
+      debugError('LlamB: Error deleting chat from history:', error);
       alert('Failed to delete chat: ' + error.message);
     }
   }
@@ -861,9 +909,9 @@
       // Save state
       saveSidebarState();
       
-      console.log('LlamB: Started new chat');
+      debugLog('LlamB: Started new chat');
     } catch (error) {
-      console.error('LlamB: Error starting new chat:', error);
+      debugError('LlamB: Error starting new chat:', error);
     }
   }
 
@@ -928,7 +976,7 @@
         timestamp: new Date().toISOString()
       };
       preservedSelections.push(selectionObj);
-      console.log('LlamB: Captured selection:', selectionObj);
+      debugLog('LlamB: Captured selection:', selectionObj);
     }
     return selection;
   }
@@ -1092,7 +1140,7 @@
       // Performance check - don't extract from very large pages
       const bodyText = document.body?.textContent || '';
       if (bodyText.length > 100000) {
-        console.log('LlamB: Page too large, using truncated content');
+        debugLog('LlamB: Page too large, using truncated content');
         const truncatedContent = bodyText.substring(0, 20000) + '\n\n[Content truncated - page too large]';
         
         // Cache the result
@@ -1189,7 +1237,7 @@
 
       return markdown;
     } catch (error) {
-      console.error('LlamB: Error extracting page content:', error);
+      debugError('LlamB: Error extracting page content:', error);
       // Fallback to simple text extraction
       return document.body?.textContent?.trim().substring(0, 10000) || '';
     }
@@ -1610,7 +1658,7 @@
 
   // Toggle sidebar visibility
   function toggleSidebar() {
-    console.log('LlamB: toggleSidebar called, current isVisible:', isVisible);
+    debugLog('LlamB: toggleSidebar called, current isVisible:', isVisible);
     
     // Capture selection before showing sidebar
     if (!isVisible) {
@@ -1624,28 +1672,28 @@
         
         if (savedMode === 'floating') {
           isFloatingMode = true;
-          console.log('LlamB: Restored floating mode preference');
+          debugLog('LlamB: Restored floating mode preference');
         } else if (savedMode === 'sidebar') {
           isFloatingMode = false;
-          console.log('LlamB: Restored sidebar mode preference');
+          debugLog('LlamB: Restored sidebar mode preference');
         }
         
         if (savedPosition) {
           floatingPosition = JSON.parse(savedPosition);
-          console.log('LlamB: Restored floating position:', floatingPosition);
+          debugLog('LlamB: Restored floating position:', floatingPosition);
         }
         
         if (savedSize) {
           floatingSize = JSON.parse(savedSize);
-          console.log('LlamB: Restored floating size:', floatingSize);
+          debugLog('LlamB: Restored floating size:', floatingSize);
         }
       } catch (e) {
-        console.error('LlamB: Error restoring preferences from localStorage:', e);
+        debugError('LlamB: Error restoring preferences from localStorage:', e);
       }
     }
     
     if (!sidebar) {
-      console.log('LlamB: Creating sidebar...');
+      debugLog('LlamB: Creating sidebar...');
       sidebar = createSidebar();
       setupEventListeners();
       // Apply theme after sidebar and buttons are created
@@ -1653,7 +1701,7 @@
     }
 
     isVisible = !isVisible;
-    console.log('LlamB: Setting isVisible to:', isVisible);
+    debugLog('LlamB: Setting isVisible to:', isVisible);
     
     // Update sidebar based on current mode
     updateSidebarDisplay();
@@ -1764,7 +1812,7 @@
   
   // Toggle between floating and sidebar modes
   function toggleFloatingMode() {
-    console.log('LlamB: toggleFloatingMode called, current isFloatingMode:', isFloatingMode);
+    debugLog('LlamB: toggleFloatingMode called, current isFloatingMode:', isFloatingMode);
     
     isFloatingMode = !isFloatingMode;
     
@@ -1811,25 +1859,25 @@
     const sendBtn = document.getElementById('llamb-send-btn');
     const chatInput = document.getElementById('llamb-chat-input');
 
-    console.log('LlamB: Setting up event listeners...');
-    console.log('LlamB: toggleBtn found:', !!toggleBtn);
-    console.log('LlamB: closeBtn found:', !!closeBtn);
-    console.log('LlamB: themeBtn found:', !!themeBtn);
-    console.log('LlamB: historyBtn found:', !!historyBtn);
-    console.log('LlamB: newChatBtn found:', !!newChatBtn);
-    console.log('LlamB: floatBtn found:', !!floatBtn);
-    console.log('LlamB: sendBtn found:', !!sendBtn);
+    debugLog('LlamB: Setting up event listeners...');
+    debugLog('LlamB: toggleBtn found:', !!toggleBtn);
+    debugLog('LlamB: closeBtn found:', !!closeBtn);
+    debugLog('LlamB: themeBtn found:', !!themeBtn);
+    debugLog('LlamB: historyBtn found:', !!historyBtn);
+    debugLog('LlamB: newChatBtn found:', !!newChatBtn);
+    debugLog('LlamB: floatBtn found:', !!floatBtn);
+    debugLog('LlamB: sendBtn found:', !!sendBtn);
     
     // Debug: Check if buttons exist in DOM
     const allBtns = document.querySelectorAll('button[id*="llamb"]');
-    console.log('LlamB: All llamb buttons in DOM:', allBtns.length);
+    debugLog('LlamB: All llamb buttons in DOM:', allBtns.length);
     allBtns.forEach(btn => {
-      console.log('LlamB: Found button:', btn.id, btn.className);
+      debugLog('LlamB: Found button:', btn.id, btn.className);
     });
     
     // Fallback: Try again with slight delay if buttons not found
     if (!toggleBtn || !closeBtn || !themeBtn || !floatBtn) {
-      console.log('LlamB: Some buttons not found, retrying in 100ms...');
+      debugLog('LlamB: Some buttons not found, retrying in 100ms...');
       setTimeout(() => {
         setupEventListeners();
       }, 100);
@@ -1838,7 +1886,7 @@
     
     if (toggleBtn) {
       toggleBtn.addEventListener('click', (e) => {
-        console.log('LlamB: Toggle button clicked!');
+        debugLog('LlamB: Toggle button clicked!');
         e.preventDefault();
         e.stopPropagation();
         toggleSidebar();
@@ -1847,7 +1895,7 @@
     
     if (closeBtn) {
       closeBtn.addEventListener('click', (e) => {
-        console.log('LlamB: Close button clicked!');
+        debugLog('LlamB: Close button clicked!');
         e.preventDefault();
         e.stopPropagation();
         
@@ -1864,7 +1912,7 @@
 
     if (themeBtn) {
       themeBtn.addEventListener('click', (e) => {
-        console.log('LlamB: Theme button clicked!');
+        debugLog('LlamB: Theme button clicked!');
         e.preventDefault();
         e.stopPropagation();
         toggleTheme();
@@ -1873,7 +1921,7 @@
 
     if (historyBtn) {
       historyBtn.addEventListener('click', (e) => {
-        console.log('LlamB: History button clicked!');
+        debugLog('LlamB: History button clicked!');
         e.preventDefault();
         e.stopPropagation();
         toggleHistoryDropdown();
@@ -1882,7 +1930,7 @@
 
     if (newChatBtn) {
       newChatBtn.addEventListener('click', (e) => {
-        console.log('LlamB: New chat button clicked!');
+        debugLog('LlamB: New chat button clicked!');
         e.preventDefault();
         e.stopPropagation();
         startNewChat();
@@ -1891,7 +1939,7 @@
 
     if (floatBtn) {
       floatBtn.addEventListener('click', (e) => {
-        console.log('LlamB: Float button clicked!');
+        debugLog('LlamB: Float button clicked!');
         e.preventDefault();
         e.stopPropagation();
         toggleFloatingMode();
@@ -2021,7 +2069,7 @@
     document.addEventListener('mousemove', (e) => {
       const dragSidebar = window.llambSidebar || sidebar || document.getElementById('llamb-chat-sidebar');
       if (window.llambDragState && window.llambDragState.isDragging && dragSidebar) {
-        console.log('LlamB: Global drag move detected at:', e.clientX, e.clientY);
+        debugLog('LlamB: Global drag move detected at:', e.clientX, e.clientY);
         
         // Calculate new position
         const newLeft = e.clientX - window.llambDragState.dragStart.x;
@@ -2034,7 +2082,7 @@
         const boundedLeft = Math.max(0, Math.min(maxLeft, newLeft));
         const boundedTop = Math.max(0, Math.min(maxTop, newTop));
         
-        console.log('LlamB: Setting new position - left:', boundedLeft, 'top:', boundedTop);
+        debugLog('LlamB: Setting new position - left:', boundedLeft, 'top:', boundedTop);
         
         // Apply position using left/top instead of right/top
         dragSidebar.style.left = boundedLeft + 'px';
@@ -2053,24 +2101,24 @@
         // Always get fresh reference to sidebar
         const resizeSidebar = document.getElementById('llamb-chat-sidebar');
         if (!resizeSidebar) {
-          console.log('LlamB: Could not find sidebar for resizing');
+          debugLog('LlamB: Could not find sidebar for resizing');
           return;
         }
         
-        console.log('LlamB: Global resize move detected at:', e.clientX, e.clientY);
+        debugLog('LlamB: Global resize move detected at:', e.clientX, e.clientY);
         const deltaX = e.clientX - window.llambDragState.resizeStart.x;
         const deltaY = e.clientY - window.llambDragState.resizeStart.y;
         
         const newWidth = window.llambDragState.resizeStart.width + deltaX;
         const newHeight = window.llambDragState.resizeStart.height + deltaY;
         
-        console.log('LlamB: New size:', newWidth, 'x', newHeight);
+        debugLog('LlamB: New size:', newWidth, 'x', newHeight);
         
         // Apply min/max constraints
         const constrainedWidth = Math.max(320, Math.min(800, newWidth));
         const constrainedHeight = Math.max(400, Math.min(window.innerHeight * 0.9, newHeight));
         
-        console.log('LlamB: Applying size:', constrainedWidth, 'x', constrainedHeight);
+        debugLog('LlamB: Applying size:', constrainedWidth, 'x', constrainedHeight);
         
         // Apply the new size
         resizeSidebar.style.width = constrainedWidth + 'px';
@@ -2088,7 +2136,7 @@
     // Global mouse up handler
     document.addEventListener('mouseup', (e) => {
       if (window.llambDragState && (window.llambDragState.isDragging || window.llambDragState.isResizing)) {
-        console.log('LlamB: Global mouse up - stopping drag/resize');
+        debugLog('LlamB: Global mouse up - stopping drag/resize');
         window.llambDragState.isDragging = false;
         window.llambDragState.isResizing = false;
         document.body.style.cursor = 'auto';
@@ -2104,7 +2152,7 @@
   
   // Setup dragging and resizing for floating window
   function setupFloatingWindowInteractions() {
-    console.log('LlamB: Setting up floating window interactions');
+    debugLog('LlamB: Setting up floating window interactions');
     
     if (!sidebar) return;
     
@@ -2121,10 +2169,10 @@
     
     // Handle header dragging and resize handle
     window.llambFloatingMouseDown = function handleMouseDown(e) {
-      console.log('LlamB: Mouse down event', e.target, e.target.className, e.target.tagName);
+      debugLog('LlamB: Mouse down event', e.target, e.target.className, e.target.tagName);
       
       if (!sidebar || !sidebar.classList.contains('llamb-floating-window')) {
-        console.log('LlamB: Not in floating mode or no sidebar');
+        debugLog('LlamB: Not in floating mode or no sidebar');
         return;
       }
       
@@ -2146,9 +2194,9 @@
         
         if (!isButton && !isAction) {
           isHeaderClick = true;
-          console.log('LlamB: Valid header drag area clicked');
+          debugLog('LlamB: Valid header drag area clicked');
         } else {
-          console.log('LlamB: Clicked on button/action area, not dragging');
+          debugLog('LlamB: Clicked on button/action area, not dragging');
         }
       }
       
@@ -2159,12 +2207,12 @@
                             e.clientY > rect.bottom - 30 && 
                             e.clientY <= rect.bottom;
       
-      console.log('LlamB: Mouse position:', e.clientX, e.clientY);
-      console.log('LlamB: Sidebar rect:', rect.right, rect.bottom);
-      console.log('LlamB: Header click:', isHeaderClick, 'Resize handle:', isResizeHandle);
+      debugLog('LlamB: Mouse position:', e.clientX, e.clientY);
+      debugLog('LlamB: Sidebar rect:', rect.right, rect.bottom);
+      debugLog('LlamB: Header click:', isHeaderClick, 'Resize handle:', isResizeHandle);
       
       if (isResizeHandle) {
-        console.log('LlamB: Starting resize from size:', rect.width, 'x', rect.height);
+        debugLog('LlamB: Starting resize from size:', rect.width, 'x', rect.height);
         // Start resizing
         window.llambDragState.isResizing = true;
         window.llambDragState.resizeStart = {
@@ -2178,7 +2226,7 @@
         document.body.style.cursor = 'se-resize';
         document.body.style.userSelect = 'none';
       } else if (isHeaderClick) {
-        console.log('LlamB: Starting drag from position:', e.clientX, e.clientY);
+        debugLog('LlamB: Starting drag from position:', e.clientX, e.clientY);
         // Start dragging
         window.llambDragState.isDragging = true;
         const rect = sidebar.getBoundingClientRect();
@@ -2215,7 +2263,7 @@
       }
     });
     
-    console.log('LlamB: Floating window interaction listeners added');
+    debugLog('LlamB: Floating window interaction listeners added');
   }
 
   // Handle suggested action clicks
@@ -2262,14 +2310,14 @@
 
   // Send message function
   async function sendMessage() {
-    console.log('LlamB: sendMessage called');
+    debugLog('LlamB: sendMessage called');
     const chatInput = document.getElementById('llamb-chat-input');
     const messagesContainer = document.getElementById('llamb-messages');
     const message = chatInput.value.trim();
 
-    console.log('LlamB: Message content:', message);
+    debugLog('LlamB: Message content:', message);
     if (!message) {
-      console.log('LlamB: Empty message, returning');
+      debugLog('LlamB: Empty message, returning');
       return;
     }
 
@@ -2288,7 +2336,7 @@
         saveSidebarState();
       } else {
         // Fallback: create simple chat object
-        console.log('LlamB: No ChatManager, creating simple chat object...');
+        debugLog('LlamB: No ChatManager, creating simple chat object...');
         currentChat = {
           id: 'chat-' + Date.now(),
           title: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
@@ -2323,9 +2371,9 @@
             chats.push(currentChat);
           }
           await chrome.storage.local.set({ 'llamb-chats': chats });
-          console.log('LlamB: Saved chat to storage (fallback)');
+          debugLog('LlamB: Saved chat to storage (fallback)');
         } catch (error) {
-          console.error('LlamB: Failed to save chat (fallback):', error);
+          debugError('LlamB: Failed to save chat (fallback):', error);
         }
       }
     }
@@ -2347,14 +2395,14 @@
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     try {
-      console.log('LlamB: Sending message:', message);
+      debugLog('LlamB: Sending message:', message);
       
       // Get page context
       const pageContext = await getPageContext();
-      console.log('LlamB: Page context:', pageContext);
+      debugLog('LlamB: Page context:', pageContext);
       
       // Send to background script for LLM processing
-      console.log('LlamB: Sending to background...');
+      debugLog('LlamB: Sending to background...');
       const response = await chrome.runtime.sendMessage({
         action: 'sendChatMessage',
         message: message,
@@ -2365,13 +2413,13 @@
         }
       });
 
-      console.log('LlamB: Response from background:', response);
+      debugLog('LlamB: Response from background:', response);
 
       if (!response || !response.success) {
         throw new Error(response?.error || 'Failed to send message');
       }
 
-      console.log('LlamB: Message sent, requestId:', response.requestId);
+      debugLog('LlamB: Message sent, requestId:', response.requestId);
 
       // Create assistant message placeholder for streaming
       const assistantMessageDiv = document.createElement('div');
@@ -2389,7 +2437,7 @@
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     } catch (error) {
-      console.error('LlamB: Error sending message:', error);
+      debugError('LlamB: Error sending message:', error);
       
       // Show error message
       const contentDiv = assistantMessageDiv.querySelector('.llamb-message-content');
@@ -2465,14 +2513,14 @@
     const assistantMessage = document.querySelector(`[data-request-id="${data.requestId}"]`);
     if (!assistantMessage) return;
 
-    console.log('LlamB: Stream ended for request:', data.requestId);
+    debugLog('LlamB: Stream ended for request:', data.requestId);
     
     // Save assistant message to chat
     if (currentChat && data.fullContent) {
       try {
         if (chatManager) {
           await chatManager.addMessage(currentChat, 'assistant', data.fullContent);
-          console.log('LlamB: Saved assistant message to chat');
+          debugLog('LlamB: Saved assistant message to chat');
         } else {
           // Fallback: add message directly
           currentChat.messages.push({
@@ -2494,10 +2542,10 @@
           // Sort by updatedAt
           chats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
           await chrome.storage.local.set({ 'llamb-chats': chats });
-          console.log('LlamB: Saved assistant message to chat (fallback)');
+          debugLog('LlamB: Saved assistant message to chat (fallback)');
         }
       } catch (error) {
-        console.error('LlamB: Error saving assistant message:', error);
+        debugError('LlamB: Error saving assistant message:', error);
       }
     }
     
@@ -2522,7 +2570,7 @@
     const assistantMessage = document.querySelector(`[data-request-id="${data.requestId}"]`);
     if (!assistantMessage) return;
 
-    console.error('LlamB: Stream error:', data.error);
+    debugError('LlamB: Stream error:', data.error);
     
     const contentDiv = assistantMessage.querySelector('.llamb-message-content');
     contentDiv.innerHTML = `
@@ -2599,7 +2647,7 @@
             pluginContent += (pluginContent ? '\n\n---\n\n' : '') + content;
           }
         } catch (error) {
-          console.error(`LlamB: Error getting content from plugin ${pluginId}:`, error);
+          debugError(`LlamB: Error getting content from plugin ${pluginId}:`, error);
         }
       }
       
@@ -2611,50 +2659,16 @@
     return context;
   }
 
-  // Handle page layout changes for fixed/absolute positioned elements
+  // Handle page layout changes - simplified to rely on body margin
   function handlePageLayoutChange() {
     // If in floating mode, reset everything to normal
     if (isFloatingMode) {
-      // Reset all positioned elements
-      const positionedElements = document.querySelectorAll('[data-llamb-original-right]');
-      positionedElements.forEach(element => {
-        if (element.dataset.llambOriginalRight) {
-          element.style.right = element.dataset.llambOriginalRight;
-          delete element.dataset.llambOriginalRight;
-        }
-      });
-      
       // Reset site-specific layouts
       resetSiteSpecificLayout();
       return;
     }
     
-    // Original sidebar mode logic
-    const sidebarWidth = isVisible && !isFloatingMode ? 380 : 0;
-    
-    // Handle fixed and sticky elements
-    const positionedElements = document.querySelectorAll('[style*="position: fixed"], [style*="position: sticky"]');
-    positionedElements.forEach(element => {
-      // Skip our own sidebar
-      if (element.id === 'llamb-chat-sidebar') return;
-      
-      const computedStyle = window.getComputedStyle(element);
-      const right = computedStyle.right;
-      
-      // Only adjust elements that are positioned from the right
-      if (right && right !== 'auto' && !element.dataset.llambOriginalRight) {
-        element.dataset.llambOriginalRight = right;
-      }
-      
-      if (isVisible && !isFloatingMode && element.dataset.llambOriginalRight) {
-        const originalRight = parseInt(element.dataset.llambOriginalRight) || 0;
-        element.style.right = (originalRight + sidebarWidth) + 'px';
-      } else if ((!isVisible || isFloatingMode) && element.dataset.llambOriginalRight) {
-        element.style.right = element.dataset.llambOriginalRight;
-      }
-    });
-    
-    // Site-specific adjustments
+    // Site-specific adjustments only when needed
     if (!isFloatingMode) {
       handleSiteSpecificLayout();
     }
@@ -2662,112 +2676,20 @@
   
   // Reset site-specific layout changes
   function resetSiteSpecificLayout() {
-    const hostname = window.location.hostname.toLowerCase();
-    
-    // Reset YouTube
-    if (hostname.includes('youtube.com')) {
-      const ytdApp = document.querySelector('ytd-app');
-      const masthead = document.querySelector('#masthead-container');
-      const pageManager = document.querySelector('#page-manager');
-      
-      [ytdApp, masthead, pageManager].forEach(element => {
-        if (element) {
-          element.style.width = '';
-          element.style.marginRight = '';
-        }
-      });
-    }
-    
-    // Reset Twitter/X
-    if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
-      const reactRoot = document.querySelector('#react-root > div');
-      const mainContent = document.querySelector('main[role="main"]');
-      
-      [reactRoot, mainContent].forEach(element => {
-        if (element) {
-          element.style.width = '';
-          element.style.marginRight = '';
-        }
-      });
-    }
-    
-    // Reset generic containers
-    const genericContainers = document.querySelectorAll('[data-llamb-original-max-width]');
-    genericContainers.forEach(element => {
-      if (element.dataset.llambOriginalMaxWidth) {
-        element.style.maxWidth = element.dataset.llambOriginalMaxWidth;
-        delete element.dataset.llambOriginalMaxWidth;
-      }
+    // Clean up any data attributes we may have set
+    const modifiedElements = document.querySelectorAll('[data-llamb-modified]');
+    modifiedElements.forEach(element => {
+      delete element.dataset.llambModified;
     });
   }
   
-  // Handle site-specific layout adjustments
+  // Handle site-specific layout adjustments - minimal approach
   function handleSiteSpecificLayout() {
-    const hostname = window.location.hostname.toLowerCase();
-    const sidebarWidth = isVisible ? 380 : 0;
+    // Most sites work fine with just the body margin adjustment from CSS
+    // Only add specific adjustments if absolutely necessary and well-tested
     
-    // YouTube specific adjustments
-    if (hostname.includes('youtube.com')) {
-      const ytdApp = document.querySelector('ytd-app');
-      const masthead = document.querySelector('#masthead-container');
-      const pageManager = document.querySelector('#page-manager');
-      
-      [ytdApp, masthead, pageManager].forEach(element => {
-        if (element) {
-          if (isVisible) {
-            element.style.width = 'calc(100% - 380px)';
-            element.style.marginRight = '0';
-          } else {
-            element.style.width = '100%';
-            element.style.marginRight = '0';
-          }
-        }
-      });
-    }
-    
-    // Twitter/X specific adjustments
-    if (hostname.includes('twitter.com') || hostname.includes('x.com')) {
-      const reactRoot = document.querySelector('#react-root > div');
-      const mainContent = document.querySelector('main[role="main"]');
-      
-      [reactRoot, mainContent].forEach(element => {
-        if (element) {
-          if (isVisible) {
-            element.style.width = 'calc(100% - 380px)';
-            element.style.marginRight = '0';
-          } else {
-            element.style.width = '100%';
-            element.style.marginRight = '0';
-          }
-        }
-      });
-    }
-    
-    // Generic container adjustments for other sites
-    if (!hostname.includes('youtube.com') && !hostname.includes('twitter.com') && !hostname.includes('x.com')) {
-      const genericContainers = document.querySelectorAll('.container, .wrapper, .main-content, [role="main"]');
-      genericContainers.forEach(element => {
-        // Skip our own sidebar
-        if (element.closest('#llamb-chat-sidebar')) return;
-        
-        if (isVisible && !isFloatingMode) {
-          const currentMaxWidth = window.getComputedStyle(element).maxWidth;
-          if (currentMaxWidth !== 'none' && !element.dataset.llambOriginalMaxWidth) {
-            element.dataset.llambOriginalMaxWidth = currentMaxWidth;
-          }
-          element.style.maxWidth = 'calc(100vw - 380px)';
-        } else {
-          if (element.dataset.llambOriginalMaxWidth) {
-            element.style.maxWidth = element.dataset.llambOriginalMaxWidth;
-            if (!isVisible || isFloatingMode) {
-              delete element.dataset.llambOriginalMaxWidth;
-            }
-          } else {
-            element.style.maxWidth = '';
-          }
-        }
-      });
-    }
+    // Mark that we've processed the layout (for cleanup purposes)
+    document.body.dataset.llambModified = 'true';
   }
 
   // Add selection change listener for real-time updates
@@ -2790,7 +2712,7 @@
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     try {
-      console.log('LlamB: Received message:', request);
+      debugLog('LlamB: Received message:', request);
       
       if (request.action === 'toggleSidebar') {
         toggleSidebar();
@@ -2798,7 +2720,7 @@
         sendResponse({ success: true });
       } else if (request.action === 'getPageContext') {
         const context = await getPageContext();
-        console.log('LlamB: Sending context:', context);
+        debugLog('LlamB: Sending context:', context);
         sendResponse(context);
       } else if (request.action === 'addMessage') {
         // Handle messages from popup
@@ -2838,7 +2760,7 @@
         sendResponse({ success: false, error: 'Unknown action' });
       }
     } catch (error) {
-      console.error('LlamB: Error handling message:', error);
+      debugError('LlamB: Error handling message:', error);
       sendResponse({ success: false, error: error.message });
     }
     
@@ -2862,7 +2784,7 @@
       
       // Notify plugins of page change
       if (pluginManager) {
-        console.log('LlamB: URL changed, notifying plugins...');
+        debugLog('LlamB: URL changed, notifying plugins...');
         await pluginManager.onPageChange();
         updatePluginChips();
       }
@@ -2898,38 +2820,38 @@
   // Handle plugin state changes from background script
   async function handlePluginStateChanged(request) {
     const { pluginId, enabled } = request;
-    console.log('LlamB: Plugin state changed:', pluginId, enabled ? 'enabled' : 'disabled');
+    debugLog('LlamB: Plugin state changed:', pluginId, enabled ? 'enabled' : 'disabled');
     
     if (!pluginManager) {
-      console.warn('LlamB: PluginManager not available, cannot handle state change');
+      debugWarn('LlamB: PluginManager not available, cannot handle state change');
       return;
     }
     
     try {
       if (enabled) {
         await pluginManager.enablePlugin(pluginId);
-        console.log('LlamB: Plugin enabled in content script:', pluginId);
+        debugLog('LlamB: Plugin enabled in content script:', pluginId);
       } else {
         await pluginManager.disablePlugin(pluginId);
-        console.log('LlamB: Plugin disabled in content script:', pluginId);
+        debugLog('LlamB: Plugin disabled in content script:', pluginId);
       }
       
       // Trigger a page change to update plugin states
       await pluginManager.onPageChange();
     } catch (error) {
-      console.error('LlamB: Error handling plugin state change:', error);
+      debugError('LlamB: Error handling plugin state change:', error);
     }
   }
   
   // Handle page updates
   async function handlePageUpdated(request) {
-    console.log('LlamB: Page updated, notifying plugins:', request.url);
+    debugLog('LlamB: Page updated, notifying plugins:', request.url);
     
     if (pluginManager) {
       try {
         await pluginManager.onPageChange();
       } catch (error) {
-        console.error('LlamB: Error notifying plugins of page update:', error);
+        debugError('LlamB: Error notifying plugins of page update:', error);
       }
     }
   }

@@ -15,7 +15,8 @@ class StorageManager {
         streamingEnabled: true,
         showThinkingBlocks: true,
         maxTokens: 4000,
-        temperature: 0.7
+        temperature: 0.7,
+        debugLogging: false  // Debug logging disabled by default
       }
     };
   }
