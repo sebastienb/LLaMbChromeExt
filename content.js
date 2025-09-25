@@ -1653,6 +1653,9 @@
     `;
 
     document.body.appendChild(sidebarContainer);
+
+    // Use data attributes instead of classes to track state (won't interfere with Next.js)
+    document.body.setAttribute('data-llamb-sidebar', 'closed');
     return sidebarContainer;
   }
 
@@ -1713,11 +1716,33 @@
   // Update sidebar display based on current mode
   function updateSidebarDisplay() {
     if (!sidebar) return;
-    
+
+    // Update float button icon to match current mode
+    const floatBtn = document.getElementById('llamb-float-btn');
+    if (floatBtn) {
+      if (isFloatingMode) {
+        // When in floating mode, show the "exit" icon (arrow pointing out)
+        floatBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-float-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+          </svg>
+        `;
+        floatBtn.title = 'Switch to sidebar mode';
+      } else {
+        // When in sidebar mode, show the window icon
+        floatBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-float-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8.25V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18V8.25m-18 0V6a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 6v2.25m-18 0h18M5.25 6h.008v.008H5.25V6ZM7.5 6h.008v.008H7.5V6Zm2.25 0h.008v.008H9.75V6Z" />
+          </svg>
+        `;
+        floatBtn.title = 'Switch to floating window';
+      }
+    }
+
     if (isVisible) {
       // Always remove display:none when showing
       sidebar.style.display = '';
-      
+
       if (isFloatingMode) {
         // Floating window mode
         sidebar.className = 'llamb-floating-window llamb-floating-entering';
@@ -1733,10 +1758,10 @@
         sidebar.style.width = floatingSize.width + 'px';
         sidebar.style.height = floatingSize.height + 'px';
         
-        // Update body for floating mode
-        document.body.classList.remove('llamb-sidebar-open', 'llamb-sidebar-closed');
-        document.body.classList.add('llamb-floating-mode');
-        
+        // Use data attributes for floating mode (won't interfere with Next.js)
+        document.body.setAttribute('data-llamb-sidebar', 'open');
+        document.body.setAttribute('data-llamb-mode', 'floating');
+
         // Update button tooltip
         const floatBtn = document.getElementById('llamb-float-btn');
         if (floatBtn) {
@@ -1752,10 +1777,10 @@
         sidebar.style.width = '380px';
         sidebar.style.height = '100vh';
         
-        // Update body for sidebar mode
-        document.body.classList.remove('llamb-floating-mode', 'llamb-sidebar-closed');
-        document.body.classList.add('llamb-sidebar-open');
-        
+        // Use data attributes for sidebar mode (won't interfere with Next.js)
+        document.body.setAttribute('data-llamb-sidebar', 'open');
+        document.body.setAttribute('data-llamb-mode', 'sidebar');
+
         // Update button tooltip
         const floatBtn = document.getElementById('llamb-float-btn');
         if (floatBtn) {
@@ -1796,10 +1821,10 @@
         // Don't set display:none for sidebar mode, let the transform handle it
       }
       
-      // Update body classes
-      document.body.classList.remove('llamb-sidebar-open', 'llamb-floating-mode');
-      document.body.classList.add('llamb-sidebar-closed');
-      
+      // Update data attributes when closing (won't interfere with Next.js)
+      document.body.setAttribute('data-llamb-sidebar', 'closed');
+      document.body.removeAttribute('data-llamb-mode');
+
       // Clear all selections when sidebar closes
       clearAllSelections();
       
@@ -1813,37 +1838,50 @@
   // Toggle between floating and sidebar modes
   function toggleFloatingMode() {
     debugLog('LlamB: toggleFloatingMode called, current isFloatingMode:', isFloatingMode);
-    
+
     isFloatingMode = !isFloatingMode;
-    
+
+    // Update the float button icon and title
+    const floatBtn = document.getElementById('llamb-float-btn');
+    if (floatBtn) {
+      if (isFloatingMode) {
+        // When in floating mode, show the "exit" icon (arrow pointing out)
+        floatBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-float-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+          </svg>
+        `;
+        floatBtn.title = 'Switch to sidebar mode';
+      } else {
+        // When in sidebar mode, show the window icon
+        floatBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="llamb-float-icon">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8.25V18a2.25 2.25 0 0 0 2.25 2.25h13.5A2.25 2.25 0 0 0 21 18V8.25m-18 0V6a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 6v2.25m-18 0h18M5.25 6h.008v.008H5.25V6ZM7.5 6h.008v.008H7.5V6Zm2.25 0h.008v.008H9.75V6Z" />
+          </svg>
+        `;
+        floatBtn.title = 'Switch to floating window';
+      }
+    }
+
     if (isFloatingMode) {
-      // Switching TO floating mode - remove body modifications
-      document.body.classList.remove('llamb-sidebar-open', 'llamb-sidebar-closed');
-      document.body.classList.add('llamb-floating-mode');
-      
+      // Switching TO floating mode - no body modifications needed
       // Reset any layout changes that were made for sidebar mode
       handlePageLayoutChange();
     } else {
       // Switching FROM floating mode back to sidebar mode
-      document.body.classList.remove('llamb-floating-mode');
-      
       if (isVisible) {
-        // Reapply sidebar body classes
-        document.body.classList.add('llamb-sidebar-open');
-        document.body.classList.remove('llamb-sidebar-closed');
-        
         // Reapply layout changes for sidebar mode
         setTimeout(() => {
           handlePageLayoutChange();
         }, 100);
       }
     }
-    
+
     // If sidebar is visible, update display immediately
     if (isVisible) {
       updateSidebarDisplay();
     }
-    
+
     // Save state
     saveSidebarState();
   }
@@ -2688,8 +2726,7 @@
     // Most sites work fine with just the body margin adjustment from CSS
     // Only add specific adjustments if absolutely necessary and well-tested
     
-    // Mark that we've processed the layout (for cleanup purposes)
-    document.body.dataset.llambModified = 'true';
+    // Don't mark body with dataset to prevent Next.js hydration errors
   }
 
   // Add selection change listener for real-time updates
@@ -2767,8 +2804,7 @@
     return true; // Keep the message channel open for async response
   });
 
-  // Initialize body with default class
-  document.body.classList.add('llamb-sidebar-closed');
+  // Use data attributes instead of classes (won't interfere with Next.js hydration)
 
   // Clear content cache when URL changes
   let lastUrl = window.location.href;
@@ -2865,7 +2901,7 @@
 
   // Clean up when page unloads
   window.addEventListener('beforeunload', () => {
-    document.body.classList.remove('llamb-sidebar-open', 'llamb-sidebar-closed');
+    // No body class cleanup needed anymore
   });
 
 })();
